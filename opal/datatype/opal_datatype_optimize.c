@@ -312,10 +312,19 @@ int32_t opal_datatype_commit( opal_datatype_t * pData )
     }
 
     /* generate iovec */
-    if( pData->iov == NULL )
+    if( pData->iov == NULL ){
         opal_generate_iovec( pData );
+        opal_datatype_compress( pData );
+    }
 
     return OPAL_SUCCESS;
+}
+
+int32_t 
+opal_datatype_compress( opal_datatype_t *pData )
+{
+
+    return 1;
 }
 
 int32_t
