@@ -839,8 +839,8 @@ ompi_datatype_t* ompi_datatype_create_from_packed_description( void** packed_buf
 
     std = sqrt( sum1/(float)(iovcnt) );
 
-    printf("\niovcnt %d average %.3f std %.5f\n", 
-            datatype->super.iovcnt, avg, std / avg);
+//    printf("\niovcnt %d average %.3f std %.5f\n", 
+  //          datatype->super.iovcnt, avg, std / avg);
 
     return datatype;
 }
