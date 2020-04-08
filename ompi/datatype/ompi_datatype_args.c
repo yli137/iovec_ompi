@@ -817,31 +817,6 @@ ompi_datatype_t* ompi_datatype_create_from_packed_description( void** packed_buf
     }
     ompi_datatype_commit( &datatype );
 
-    struct iovec *iov = datatype->super.iov;
-    uint32_t iovcnt = datatype->super.iovcnt;
-
-    ptrdiff_t gap[iovcnt];
-    for( uint32_t i = 0; i < iovcnt; i++ ){
-        if( i == 0 )
-            gap[i] = (ptrdiff_t)(iov[i].iov_base);
-        else 
-            gap[i] = (ptrdiff_t)(iov[i].iov_base) - iov[i-1].iov_len - (ptrdiff_t)(iov[i-1].iov_base);
-    }
-
-    float sum = 0, sum1 = 0, avg, std;
-    for( int i = 0; i < iovcnt; i++ ){
-        sum += (float)(gap[i]);
-    }
-    avg = sum / (float)(iovcnt);
-
-    for( int i = 0; i < iovcnt; i++ )
-        sum1 += pow( ((float)(gap[i]) - avg), 2 );
-
-    std = sqrt( sum1/(float)(iovcnt) );
-
-    printf("\niovcnt %d average %.3f std %.5f\n", 
-            datatype->super.iovcnt, avg, std / avg);
-
     return datatype;
 }
 
