@@ -17,12 +17,109 @@
 #include <unistd.h>
 #include <math.h>
 
+#include <errno.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+
+#include <time.h>
+#include <string.h>
+#include <dirent.h>
+
+#include "ompi/datatype/ompi_datatype.h"
+#include "opal/datatype/opal_convertor.h"
+#include "ompi/proc/proc.h"
+
 #if 0 && OPEN_MPI
 extern void ompi_datatype_dump( MPI_Datatype ddt );
 #define MPI_DDT_DUMP(ddt) ompi_datatype_dump( (ddt) )
 #else
 #define MPI_DDT_DUMP(ddt)
 #endif  /* OPEN_MPI */
+
+#define L1size sysconf(_SC_LEVEL1_DCACHE_SIZE)
+#define L2size sysconf(_SC_LEVEL2_CACHE_SIZE)
+#define L3size sysconf(_SC_LEVEL2_CACHE_SIZE)
+void cache_flush(){
+    char *cache = (char*)calloc(L1size+L2size+L3size, sizeof(char));
+    free(cache);
+}
+
+static MPI_Datatype
+create_random_indexed( int count, int seed )
+{
+    MPI_Datatype ddt;
+    int indices[count], block[count];
+
+    srand(seed);
+    indices[0] = 0;
+    block[0] = rand() % 64;
+    for( int i = 1; i < count; i++ ){
+        indices[i] = i * 64 + rand() % 64;
+        if( indices[i] % 64 != 0 ){
+            block[i] = rand() % (indices[i] % 64);
+        } else {
+            block[i] = rand() % 64;
+        }
+    }
+
+    MPI_Type_indexed( count, block, indices, MPI_CHAR, &ddt );
+    MPI_Type_commit( &ddt );
+
+    return ddt;
+}
+
+static MPI_Datatype
+create_diagonal( int count )
+{
+    MPI_Datatype ddt;
+    int indices[count], block[count];
+
+    for( int i = 0; i < count; i++ ){
+        indices[i] = i + i * count;
+        block[i] = 1;
+    }
+
+    MPI_Type_indexed( count, block, indices, MPI_DOUBLE, &ddt );
+    MPI_Type_commit( &ddt );
+
+    return ddt;
+}
+
+static MPI_Datatype
+create_upper_triangle( int count )
+{
+    MPI_Datatype ddt;
+    int indices[count], block[count];
+
+    for( int i = 0; i < count; i++ ){
+        indices[i] = i + i * count;
+        block[i] = count - i;
+    }
+
+    MPI_Type_indexed( count, block, indices, MPI_DOUBLE, &ddt );
+    MPI_Type_commit( &ddt );
+
+    return ddt;
+}
+
+static MPI_Datatype
+create_lower_triangle( int count )
+{
+    MPI_Datatype ddt;
+    int indices[count], block[count];
+
+    for( int i = 0; i < count; i++ ){
+        indices[i] = i * count;
+        block[i] = i;
+    }
+
+    MPI_Type_indexed( count, block, indices, MPI_DOUBLE, &ddt );
+    MPI_Type_commit( &ddt );
+
+    return ddt;
+}
 
 static MPI_Datatype
 create_merged_contig_with_gaps(int count)  /* count of the basic datatype */
@@ -216,15 +313,16 @@ create_indexed_gap_optimized_ddt( void )
 #define DO_ISEND_IRECV                  0x08000000
 #define DO_IRECV_SEND                   0x10000000
 #define DO_IRECV_ISEND                  0x20000000
+#define DO_PINGPONG                     0x40000000
 
-#define MIN_LENGTH   1024
-#define MAX_LENGTH   (1024*1024)
+#define MIN_LENGTH   8
+static size_t MAX_LENGTH = 4*(1024*1024);
 
-static int cycles  = 100;
-static int trials  = 20;
+static int cycles  = 10;
+static int trials  = 10;
 static int warmups = 2;
 
-static void print_result( int length, int trials, double* timers )
+static void print_result( size_t length, int trials, double* timers )
 {
     double bandwidth, clock_prec, temp;
     double min_time, max_time, average, std_dev = 0.0;
@@ -269,13 +367,62 @@ static void print_result( int length, int trials, double* timers )
             min_time, max_time, (100.0 * std_dev) / average );
 }
 
-static int pack( int cycles,
-                 MPI_Datatype sdt, int scount, void* sbuf,
-                 void* packed_buf )
+static void do_pingpong_test( MPI_Datatype sddt, MPI_Datatype rddt, int scount, int rcount, void* sbuf, void* rbuf )
 {
-    int position, myself, c, t, outsize;
+    int rank, position, outsize;
     double timers[trials];
 
+    MPI_Comm_rank( MPI_COMM_WORLD, &rank );
+
+    if( rank == 0 ){
+        MPI_Type_size( sddt, &outsize );
+        outsize *= scount;
+
+        /* warmup */
+        for( int i = 0; i < warmups; i++ ){
+            MPI_Send( sbuf, scount, sddt, 1, 0, MPI_COMM_WORLD );
+            MPI_Recv( rbuf, rcount, rddt, 1, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+        }
+        
+        for( int i = 0; i < trials; i++ ){
+            cache_flush();
+
+            timers[i] = MPI_Wtime();
+            for( int j = 0; j < cycles; j++ ){
+                cache_flush();
+                MPI_Send( sbuf, scount, sddt, 1, 0, MPI_COMM_WORLD );
+                cache_flush();
+                MPI_Recv( rbuf, rcount, rddt, 1, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+            }
+            timers[i] = (MPI_Wtime() - timers[i]) / 2 / cycles;
+        }
+
+        print_result( (size_t)outsize, trials, timers );
+    } else if( rank == 1 ) {
+        for( int i = 0; i < warmups; i++ ){
+            MPI_Recv( rbuf, rcount, rddt, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+            MPI_Send( sbuf, scount, sddt, 0, 1, MPI_COMM_WORLD );
+        }
+        
+        for( int i = 0; i < trials; i++ ){
+            for( int j = 0; j < cycles; j++ ){
+                MPI_Recv( rbuf, rcount, rddt, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE );
+                MPI_Send( sbuf, scount, sddt, 0, 1, MPI_COMM_WORLD );
+            }
+        }
+    }
+}
+
+static int pack( int cycles,
+        MPI_Datatype sdt, int scount, void* sbuf,
+        void* packed_buf )
+{
+    int position, myself, c, t;
+    int outsize;
+    double timers[trials];
+    MPI_Aint lb, extent;
+
+    MPI_Type_get_extent( sdt, &lb, &extent );
     MPI_Type_size( sdt, &outsize );
     outsize *= scount;
 
@@ -287,24 +434,29 @@ static int pack( int cycles,
             MPI_Pack(sbuf, scount, sdt, packed_buf, outsize, &position, MPI_COMM_WORLD);
         }
     }
-    
+
+    cache_flush();
     for( t = 0; t < trials; t++ ) {
         timers[t] = MPI_Wtime();
         for( c = 0; c < cycles; c++ ) {
             position = 0;
             MPI_Pack(sbuf, scount, sdt, packed_buf, outsize, &position, MPI_COMM_WORLD);
+            cache_flush();
         }
         timers[t] = (MPI_Wtime() - timers[t]) / cycles;
     }
-    print_result( outsize, trials, timers );
+
+    print_result( (size_t)outsize, trials, timers );
+
     return 0;
 }
 
 static int unpack( int cycles,
-                   void* packed_buf,
-                   MPI_Datatype rdt, int rcount, void* rbuf )
+        void* packed_buf,
+        MPI_Datatype rdt, int rcount, void* rbuf )
 {
-    int position, myself, c, t, insize;
+    int position, myself, c, t;
+    int insize;
     double timers[trials];
 
     MPI_Type_size( rdt, &insize );
@@ -319,261 +471,172 @@ static int unpack( int cycles,
         }
     }
 
+    cache_flush();
     for( t = 0; t < trials; t++ ) {
         timers[t] = MPI_Wtime();
         for( c = 0; c < cycles; c++ ) {
             position = 0;
             MPI_Unpack(packed_buf, insize, &position, rbuf, rcount, rdt, MPI_COMM_WORLD);
+            cache_flush();
         }
         timers[t] = (MPI_Wtime() - timers[t]) / cycles;
     }
-    print_result( insize, trials, timers );
+
+    print_result( (size_t)insize, trials, timers );
+
     return 0;
 }
 
-static int isend_recv( int cycles,
-                       MPI_Datatype sdt, int scount, void* sbuf,
-                       MPI_Datatype rdt, int rcount, void* rbuf )
+static int do_test_for_ddt( int doop, MPI_Datatype *sddt, MPI_Datatype *rddt, size_t true_length )
 {
-    int myself, tag = 0, c, t, slength, rlength;
-    MPI_Status status;
-    MPI_Request req;
-    double timers[trials];
-
-    MPI_Type_size( sdt, &slength );
-    slength *= scount;
-    MPI_Type_size( rdt, &rlength );
-    rlength *= rcount;
-
-    MPI_Comm_rank( MPI_COMM_WORLD, &myself );
-
-    for( t = 0; t < trials; t++ ) {
-        timers[t] = MPI_Wtime();
-        for( c = 0; c < cycles; c++ ) {
-            MPI_Isend( sbuf, scount, sdt, myself, tag, MPI_COMM_WORLD, &req );
-            MPI_Recv( rbuf, rcount, rdt, myself, tag, MPI_COMM_WORLD, &status );
-            MPI_Wait( &req, &status );
-        }
-        timers[t] = (MPI_Wtime() - timers[t]) / cycles;
-    }
-    print_result( rlength, trials, timers );
-    return 0;
-}
-
-static int irecv_send( int cycles,
-                       MPI_Datatype sdt, int scount, void* sbuf,
-                       MPI_Datatype rdt, int rcount, void* rbuf )
-{
-    int myself, tag = 0, c, t, slength, rlength;
-    MPI_Request req;
-    MPI_Status status;
-    double timers[trials];
-
-    MPI_Type_size( sdt, &slength );
-    slength *= scount;
-    MPI_Type_size( rdt, &rlength );
-    rlength *= rcount;
-
-    MPI_Comm_rank( MPI_COMM_WORLD, &myself );
-
-    for( t = 0; t < trials; t++ ) {
-        timers[t] = MPI_Wtime();
-        for( c = 0; c < cycles; c++ ) {
-            MPI_Irecv( rbuf, rcount, rdt, myself, tag, MPI_COMM_WORLD, &req );
-            MPI_Send( sbuf, scount, sdt, myself, tag, MPI_COMM_WORLD );
-            MPI_Wait( &req, &status );
-        }
-        timers[t] = (MPI_Wtime() - timers[t]) / cycles;
-    }
-    print_result( rlength, trials, timers );
-    return 0;
-}
-
-static int isend_irecv_wait( int cycles,
-                             MPI_Datatype sdt, int scount, void* sbuf,
-                             MPI_Datatype rdt, int rcount, void* rbuf )
-{
-    int myself, tag = 0, c, t, slength, rlength;
-    MPI_Request requests[2];
-    MPI_Status statuses[2];
-    double timers[trials];
-
-    MPI_Type_size( sdt, &slength );
-    slength *= scount;
-    MPI_Type_size( rdt, &rlength );
-    rlength *= rcount;
-
-    MPI_Comm_rank( MPI_COMM_WORLD, &myself );
-
-    for( t = 0; t < trials; t++ ) {
-        timers[t] = MPI_Wtime();
-        for( c = 0; c < cycles; c++ ) {
-            MPI_Isend( sbuf, scount, sdt, myself, tag, MPI_COMM_WORLD, &requests[0] );
-            MPI_Irecv( rbuf, rcount, rdt, myself, tag, MPI_COMM_WORLD, &requests[1] );
-            MPI_Waitall( 2, requests, statuses );
-        }
-        timers[t] = (MPI_Wtime() - timers[t]) / cycles;
-    }
-    print_result( rlength, trials, timers );
-    return 0;
-}
-
-static int irecv_isend_wait( int cycles,
-                             MPI_Datatype sdt, int scount, void* sbuf,
-                             MPI_Datatype rdt, int rcount, void* rbuf )
-{
-    int myself, tag = 0, c, t, slength, rlength;
-    MPI_Request requests[2];
-    MPI_Status statuses[2];
-    double timers[trials];
-
-    MPI_Type_size( sdt, &slength );
-    slength *= scount;
-    MPI_Type_size( rdt, &rlength );
-    rlength *= rcount;
-
-    MPI_Comm_rank( MPI_COMM_WORLD, &myself );
-
-    for( t = 0; t < trials; t++ ) {
-        timers[t] = MPI_Wtime();
-        for( c = 0; c < cycles; c++ ) {
-            MPI_Irecv( rbuf, rcount, rdt, myself, tag, MPI_COMM_WORLD, &requests[0] );
-            MPI_Isend( sbuf, scount, sdt, myself, tag, MPI_COMM_WORLD, &requests[1] );
-            MPI_Waitall( 2, requests, statuses );
-        }
-        timers[t] = (MPI_Wtime() - timers[t]) / cycles;
-    }
-    print_result( rlength, trials, timers);
-    return 0;
-}
-
-static int do_test_for_ddt( int doop, MPI_Datatype sddt, MPI_Datatype rddt, int length )
-{
-    MPI_Aint lb, extent;
+    int rank, size, divnum;
+    MPI_Aint lb, extent, rextent, outsize;
     char *sbuf, *rbuf;
     int i;
 
+    MPI_Comm_size( MPI_COMM_WORLD, &size );
+
+    MPI_Comm_rank( MPI_COMM_WORLD, &rank );
+    MPI_Comm_size( MPI_COMM_WORLD, &size );
+
+    MPI_Type_size( sddt , &outsize );
     MPI_Type_get_extent( sddt, &lb, &extent );
+    MPI_Type_get_extent( rddt, &lb, &rextent );
+
+    size_t length;
+    if( lb != 0 )
+        length = (lb + extent) * 10;
+    else 
+        length = true_length;
+
     sbuf = (char*)malloc( length );
     rbuf = (char*)malloc( length );
-    if( doop & DO_PACK ) {
-        printf("# Pack (max length %d)\n", length);
-        for( i = 1; i <= (length/extent); i *= 2 ) {
+
+    if( rank == 0 ){
+
+        printf("# Pack (max length %zu)\n", length);
+        for( i = 1; i <= length / extent; i *= 2 ) {
+            cache_flush();
             pack( cycles, sddt, i, sbuf, rbuf );
         }
-    }
 
-    if( doop & DO_UNPACK ) {
-        printf("# Unpack (length %d)\n", length);
-        for( i = 1; i <= (length/extent); i *= 2 ) {
+        printf("# Unpack (length %zu)\n", length);
+        for( i = 1; i <= length / extent; i *= 2 ) {
+            cache_flush();
             unpack( cycles, sbuf, rddt, i, rbuf );
         }
     }
 
-    if( doop & DO_ISEND_RECV ) {
-        printf( "# Isend recv (length %d)\n", length );
-        for( i = 1; i <= (length/extent); i *= 2 ) {
-            isend_recv( cycles, sddt, i, sbuf, rddt, i, rbuf );
-        }
-    }
+    if( rank == 0 )
+        printf("# Pingpong (length %zu)\n", length);
+    MPI_Barrier( MPI_COMM_WORLD );
 
-    if( doop & DO_ISEND_IRECV ) {
-        printf( "# Isend Irecv Wait (length %d)\n", length );
-        for( i = 1; i <= (length/extent); i *= 2 ) {
-            isend_irecv_wait( cycles, sddt, i, sbuf, rddt, i, rbuf );
+    if( size == 2 ){
+        for( i = 1; i <= length / extent; i*=2 ){
+            cache_flush();
+            do_pingpong_test( sddt, rddt, i, i, sbuf, rbuf );
         }
     }
+    
+    MPI_Barrier( MPI_COMM_WORLD );
 
-    if( doop & DO_IRECV_SEND ) {
-        printf( "# Irecv send (length %d)\n", length );
-        for( i = 1; i <= (length/extent); i *= 2 ) {
-            irecv_send( cycles, sddt, i, sbuf, rddt, i, rbuf );
-        }
-    }
-
-    if( doop & DO_IRECV_SEND ) {
-        printf( "# Irecv Isend Wait (length %d)\n", length );
-        for( i = 1; i <= (length/extent); i *= 2 ) {
-            irecv_isend_wait( cycles, sddt, i, sbuf, rddt, i, rbuf );
-        }
-    }
     free( sbuf );
     free( rbuf );
     return 0;
 }
 
+
 int main( int argc, char* argv[] )
 {
-    int run_tests = DO_STRUCT_MERGED_WITH_GAP_RESIZED;  /* do all datatype tests by default */
+    int run_tests = 0xffff;  /* do all datatype tests by default */
     int rank, size;
-    MPI_Datatype ddt;
+    MPI_Datatype ddt, sddt, rddt;
 
-    run_tests |= DO_PACK | DO_UNPACK;
-    
+    run_tests |= DO_PACK | DO_UNPACK | DO_CONTIG | DO_PINGPONG;
+
     MPI_Init (&argc, &argv);
 
     MPI_Comm_rank (MPI_COMM_WORLD, &rank);
     MPI_Comm_size (MPI_COMM_WORLD, &size);
 
-    if( rank != 0 ) {
+    if( rank > 1 ) {
         MPI_Finalize();
         exit(0);
     }
 
-    if( run_tests & DO_CONTIG ) {
-        printf( "\ncontiguous datatype\n\n" );
-        do_test_for_ddt( run_tests, MPI_INT, MPI_INT, MAX_LENGTH );
-    }
-
-    if( run_tests & DO_INDEXED_GAP ) {
-        printf( "\nindexed gap\n\n" );
-        ddt = create_indexed_gap_ddt();
-        MPI_DDT_DUMP( ddt );
+   
+    for( int i = 1; i < 8; i++ ){
+        if( rank == 0 )
+            printf( "\n! vector %d/8 double type\n\n", i );
+        MPI_Type_vector( 64, i, 8, MPI_DOUBLE, &ddt );
+        MPI_Type_commit( &ddt );
         do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
         MPI_Type_free( &ddt );
     }
 
-    if( run_tests & DO_OPTIMIZED_INDEXED_GAP ) {
-        printf( "\noptimized indexed gap\n\n" );
-        ddt = create_indexed_gap_optimized_ddt();
-        MPI_DDT_DUMP( ddt );
-        do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
-        MPI_Type_free( &ddt );
-    }
+    if( rank == 0 )
+        printf( "\n! indexed gap\n\n" );
+    ddt = create_indexed_gap_ddt();
+    do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
+    MPI_Type_free( &ddt );
 
-    if( run_tests & DO_CONSTANT_GAP ) {
-        printf( "\nconstant indexed gap\n\n" );
-        ddt = create_indexed_constant_gap_ddt( 80, 100, 1 );
-        MPI_DDT_DUMP( ddt );
-        do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
-        MPI_Type_free( &ddt );
-    }
+    if( rank == 0 )
+        printf( "\n! optimized indexed gap\n\n" );
+    ddt = create_indexed_gap_optimized_ddt();
+    do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
+    MPI_Type_free( &ddt );
 
-    if( run_tests & DO_CONSTANT_GAP ) {
-        printf( "\noptimized constant indexed gap\n\n" );
-        ddt = create_optimized_indexed_constant_gap_ddt( 80, 100, 1 );
-        MPI_DDT_DUMP( ddt );
-        do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
-        MPI_Type_free( &ddt );
-    }
+    if( rank == 0 )
+        printf( "\n! constant indexed gap\n\n" );
+    ddt = create_indexed_constant_gap_ddt( 80, 100, 1 );
+    do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
+    MPI_Type_free( &ddt );
 
-    if( run_tests & DO_STRUCT_CONSTANT_GAP_RESIZED ) {
-        printf( "\nstruct constant gap resized\n\n" );
-        ddt = create_struct_constant_gap_resized_ddt( 0 /* unused */, 0 /* unused */, 0 /* unused */ );
-        MPI_DDT_DUMP( ddt );
-        do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
-        MPI_Type_free( &ddt );
-    }
+    if( rank == 0 )
+        printf( "\n! optimized constant indexed gap\n\n" );
+    ddt = create_optimized_indexed_constant_gap_ddt( 80, 100, 1 );
+    do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
+    MPI_Type_free( &ddt );
 
-    if( run_tests & DO_STRUCT_MERGED_WITH_GAP_RESIZED ) {
-        printf( "\nstruct constant gap resized\n\n" );
-        ddt = create_merged_contig_with_gaps( 1 );
-        MPI_DDT_DUMP( ddt );
-        do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
-        MPI_Type_free( &ddt );
-    }
+    if( rank == 0 )
+        printf( "\n! struct constant gap resized\n\n" );
+    ddt = create_struct_constant_gap_resized_ddt( 0, 0, 0 );
+    do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
+    MPI_Type_free( &ddt );
 
-    MPI_Finalize ();
+    if( rank == 0 )
+        printf( "\n! struct constant gap resized\n\n" );
+    ddt = create_merged_contig_with_gaps( 1 );
+    do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
+    MPI_Type_free( &ddt );
+
+    if( rank == 0 )
+        printf("\n\n! Diagnal matrix\n");
+    ddt = create_diagonal(100);
+    do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
+    MPI_Type_free( &ddt );
+
+    if( rank == 0 )
+        printf("\n\n! Upper triangle matrix\n");
+    ddt = create_upper_triangle(100);
+    do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
+    MPI_Type_free( &ddt );
+
+    if( rank == 0 )
+        printf("\n\n! Lower triangle matrix\n");
+    ddt = create_lower_triangle(100);
+    do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
+    MPI_Type_free( &ddt );
+
+    
+    if( rank == 0 )
+        printf("\n\n! Randomized indexed type\n");
+    ddt = create_random_indexed( 2, 0 );
+    do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
+    MPI_Type_free( &ddt );
+
+    MPI_Finalize();
     exit(0);
 }
+
 

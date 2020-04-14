@@ -415,26 +415,27 @@ opal_iovec_compress_pack( opal_convertor_t *convertor, struct iovec *out_iov,
     while( convertor->pStack[2].count ){
         for( ptr = pData->compress.storage + convertor->pStack[4].disp; 
                 ptr < pData->compress.storage + pData->compress.iov_length; ) {
-            if( 0 == ((uint8_t)0x01 & ptr[0]) ) {  /* last bit = 0: 8 bits */
+
+            if( 0 == ((uint8_t)0x01 & ptr[0]) ) { 
                 opal_datatype_iovec_storage_int8_t* s8 = (opal_datatype_iovec_storage_int8_t*)ptr;
                 length = (size_t)s8->length >> 1;
                 disp = (ptrdiff_t)s8->disp;
-                type_case = 0;
-            } else if( 0 == (0x02 & ptr[0]) ) {  /* last 2 bits = 01: 16 bits */
+                type_case = sizeof(opal_datatype_iovec_storage_int8_t);
+            } else if( 0 == (0x02 & ptr[0]) ) { 
                 opal_datatype_iovec_storage_int16_t* s16 = (opal_datatype_iovec_storage_int16_t*)ptr;
                 length = (size_t)(s16->length >> 2);
                 disp = (ptrdiff_t)s16->disp;
-                type_case = 1;
-            } else if( 0 == (0x04 & ptr[0]) ) {  /* last 3 bits = 011: 32 bits */
+                type_case = sizeof(opal_datatype_iovec_storage_int16_t);
+            } else if( 0 == (0x04 & ptr[0]) ) { 
                 opal_datatype_iovec_storage_int32_t* s32 = (opal_datatype_iovec_storage_int32_t*)ptr;
                 length = (size_t)(s32->length >> 3);
                 disp = s32->disp;
-                type_case = 2;
-            } else {  /* last 3 bits = 111: 64 bits */
+                type_case = sizeof(opal_datatype_iovec_storage_int32_t);
+            } else { 
                 opal_datatype_iovec_storage_int64_t* s64 = (opal_datatype_iovec_storage_int64_t*)ptr;
                 length = s64->length >> 3;
                 disp = s64->disp;
-                type_case = 3;
+                type_case = sizeof(opal_datatype_iovec_storage_int64_t);
             }
 
 restart_compress_pack:
@@ -476,24 +477,8 @@ restart_compress_pack:
             track -= length - convertor->pStack[3].disp;
             convertor->pStack[3].disp = 0;
 
-            switch (type_case)
-            {
-                case 0:
-                    ptr += sizeof(opal_datatype_iovec_storage_int8_t);
-                    convertor->pStack[4].disp += sizeof(opal_datatype_iovec_storage_int8_t);
-                    break;
-                case 1:
-                    ptr += sizeof(opal_datatype_iovec_storage_int16_t);
-                    convertor->pStack[4].disp += sizeof(opal_datatype_iovec_storage_int16_t);
-                    break;
-                case 2:
-                    ptr += sizeof(opal_datatype_iovec_storage_int32_t);
-                    convertor->pStack[4].disp += sizeof(opal_datatype_iovec_storage_int32_t);
-                    break;
-                default:
-                    ptr += sizeof(opal_datatype_iovec_storage_int64_t);
-                    convertor->pStack[4].disp += sizeof(opal_datatype_iovec_storage_int64_t);
-            }
+            ptr += type_case;
+            convertor->pStack[4].disp += type_case;
         }
 
         convertor->pStack[2].disp += pData->ub - pData->lb;
@@ -530,34 +515,37 @@ opal_iovec_compress_unpack( opal_convertor_t *convertor, struct iovec *out_iov,
 
     ptrdiff_t disp;
     size_t length;
-    int8_t type_case;
+    int type_case;
 
     char *ptr;
 
     while( convertor->pStack[2].count ) {
         for( ptr = pData->compress.storage + convertor->pStack[4].disp; 
                 ptr < pData->compress.storage + pData->compress.iov_length; ) {
-            if( 0 == ((uint8_t)0x01 & ptr[0]) ) {  /* last bit = 0: 8 bits */
+
+            if( 0 == ((uint8_t)0x01 & ptr[0]) ) { 
                 opal_datatype_iovec_storage_int8_t* s8 = (opal_datatype_iovec_storage_int8_t*)ptr;
                 length = (size_t)s8->length >> 1;
                 disp = (ptrdiff_t)s8->disp;
-                type_case = 0;
-            } else if( 0 == (0x02 & ptr[0]) ) {  /* last 2 bits = 01: 16 bits */
+                type_case = sizeof(opal_datatype_iovec_storage_int8_t);
+
+            } else if( 0 == (0x02 & ptr[0]) ) { 
                 opal_datatype_iovec_storage_int16_t* s16 = (opal_datatype_iovec_storage_int16_t*)ptr;
                 length = (size_t)(s16->length >> 2);
                 disp = (ptrdiff_t)s16->disp;
-                type_case = 1;
-            } else if( 0 == (0x04 & ptr[0]) ) {  /* last 3 bits = 011: 32 bits */
+                type_case = sizeof(opal_datatype_iovec_storage_int16_t);
+            } else if( 0 == (0x04 & ptr[0]) ) { 
                 opal_datatype_iovec_storage_int32_t* s32 = (opal_datatype_iovec_storage_int32_t*)ptr;
                 length = (size_t)(s32->length >> 3);
                 disp = s32->disp;
-                type_case = 2;
-            } else {  /* last 3 bits = 111: 64 bits */
+                type_case = sizeof(opal_datatype_iovec_storage_int32_t);
+            } else { 
                 opal_datatype_iovec_storage_int64_t* s64 = (opal_datatype_iovec_storage_int64_t*)ptr;
                 length = s64->length >> 3;
                 disp = s64->disp;
-                type_case = 3;
+                type_case = sizeof(opal_datatype_iovec_storage_int64_t);
             }
+
 restart_compress_unpack:
             if( iov_track < (length - convertor->pStack[3].disp) && iov_track < track ){
                 memcpy( dst + disp + convertor->pStack[3].disp,
@@ -596,24 +584,8 @@ restart_compress_unpack:
             iov_track -= length - convertor->pStack[3].disp;
             convertor->pStack[3].disp = 0;
 
-            switch (type_case)
-            {
-                case 0:
-                    ptr += sizeof(opal_datatype_iovec_storage_int8_t);
-                    convertor->pStack[4].disp += sizeof(opal_datatype_iovec_storage_int8_t);
-                    break;
-                case 1:
-                    ptr += sizeof(opal_datatype_iovec_storage_int16_t);
-                    convertor->pStack[4].disp += sizeof(opal_datatype_iovec_storage_int16_t);
-                    break;
-                case 2:
-                    ptr += sizeof(opal_datatype_iovec_storage_int32_t);
-                    convertor->pStack[4].disp += sizeof(opal_datatype_iovec_storage_int32_t);
-                    break;
-                default:
-                    ptr += sizeof(opal_datatype_iovec_storage_int64_t);
-                    convertor->pStack[4].disp += sizeof(opal_datatype_iovec_storage_int64_t);
-            }
+            ptr += type_case;
+            convertor->pStack[4].disp += type_case;
         }
 
         convertor->pStack[2].disp += pData->ub - pData->lb;
