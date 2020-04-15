@@ -379,6 +379,7 @@ opal_datatype_compress( opal_datatype_t *pData )
             bytes = sizeof(opal_datatype_iovec_storage_int64_t);
         }  /* otherwise 3 bits = 111 */
 
+        bytes = sizeof(opal_datatype_iovec_storage_int32_t);
         if( (flexi->iov_pos + bytes) > flexi->iov_length ) {
             size_t new_length = (0 == flexi->iov_length ? 128 : (flexi->iov_length * 2));
             void* ptr = realloc( flexi->storage, new_length);

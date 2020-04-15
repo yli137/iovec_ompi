@@ -568,12 +568,13 @@ int main( int argc, char* argv[] )
     for( int i = 1; i < 8; i++ ){
         if( rank == 0 )
             printf( "\n! vector %d/8 double type\n\n", i );
-        MPI_Type_vector( 64, i, 8, MPI_DOUBLE, &ddt );
+        MPI_Type_vector( 16, i, 8, MPI_DOUBLE, &ddt );
         MPI_Type_commit( &ddt );
         do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
         MPI_Type_free( &ddt );
     }
 
+    /*
     if( rank == 0 )
         printf( "\n! indexed gap\n\n" );
     ddt = create_indexed_gap_ddt();
@@ -627,11 +628,11 @@ int main( int argc, char* argv[] )
     ddt = create_lower_triangle(100);
     do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
     MPI_Type_free( &ddt );
-
+*/
     
     if( rank == 0 )
         printf("\n\n! Randomized indexed type\n");
-    ddt = create_random_indexed( 2, 0 );
+    ddt = create_random_indexed( 16, 0 );
     do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
     MPI_Type_free( &ddt );
 
