@@ -568,7 +568,7 @@ int main( int argc, char* argv[] )
         do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
         MPI_Type_free( &ddt );
 
-        printf( "\n!optimized indexed gap\n\n" );
+        printf( "\n! optimized indexed gap\n\n" );
         ddt = create_indexed_gap_optimized_ddt();
         MPI_DDT_DUMP( ddt );
         do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
