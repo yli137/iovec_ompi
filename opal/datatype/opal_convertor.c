@@ -384,6 +384,9 @@ opal_iovec_pack( opal_convertor_t *convertor,
     size_t track = *max_data, iov_track;
     uint32_t i, iov_count = 0, j;
 
+    char *mem_dst, *mem_src;
+    size_t len;
+
     dst = out_iov[iov_count].iov_base;
     iov_track = out_iov[iov_count].iov_len;
 
@@ -395,45 +398,55 @@ opal_iovec_pack( opal_convertor_t *convertor,
         for( i = convertor->pStack[1].index; i < pData->iovcnt; i++ ) {
 restart_pack:
             if( OPAL_UNLIKELY( iov_track < (iov[i].iov_len - convertor->pStack[1].disp) && iov_track < track )){
-                memcpy( dst,
-                        src + (ptrdiff_t)(iov[i].iov_base) + convertor->pStack[1].disp,
-                        iov_track);
+                mem_dst = dst;
+                mem_src = src + (ptrdiff_t)(iov[i].iov_base) + convertor->pStack[1].disp;
+                len = iov_track;
+                
                 convertor->pStack[1].disp += iov_track;
                 convertor->pStack[1].index = i;
                 track -= iov_track;
 
                 iov_count++;
-                if( iov_count == *out_size )
-                    goto complete_pack;
 
                 dst = out_iov[iov_count].iov_base;
                 iov_track = out_iov[iov_count].iov_len;
+
+                memcpy( mem_dst, mem_src, len );
+
+                if( iov_count == *out_size )
+                    goto complete_pack;
 
                 goto restart_pack;
             }
 
             if( OPAL_UNLIKELY( track < (iov[i].iov_len - convertor->pStack[1].disp) || track == 0) ){
-                memcpy( dst,
-                        src + (ptrdiff_t)(iov[i].iov_base) + convertor->pStack[1].disp,
-                        track);
+                mem_src = src + (ptrdiff_t)(iov[i].iov_base) + convertor->pStack[1].disp;
+                len = track;
 
                 convertor->pStack[1].disp  += track;
                 convertor->pStack[1].index = i;
                 track = 0;
+
+                memcpy( dst, mem_src, len );
 
                 goto complete_pack;
             }
 
             if( i + 1 != pData->iovcnt )
                 OPAL_PREFETCH( src + (ptrdiff_t)(iov[i+1].iov_base), 0, 3 );
-            memcpy( dst,
-                    src + (ptrdiff_t)(iov[i].iov_base) + convertor->pStack[1].disp,
-                    iov[i].iov_len - convertor->pStack[1].disp );
-
-            dst += iov[i].iov_len - convertor->pStack[1].disp;
+            
             iov_track -= iov[i].iov_len - convertor->pStack[1].disp;
             track -= iov[i].iov_len - convertor->pStack[1].disp;
+
+            mem_dst = dst;
+            mem_src = src + (ptrdiff_t)(iov[i].iov_base) + convertor->pStack[1].disp;
+            len = iov[i].iov_len - convertor->pStack[1].disp;
+
+            dst += iov[i].iov_len - convertor->pStack[1].disp;
             convertor->pStack[1].disp = 0;
+
+            memcpy( mem_dst, mem_src, len );
+        
         }
 
         convertor->pStack[0].disp += pData->ub - pData->lb;
@@ -471,6 +484,9 @@ opal_iovec_unpack( opal_convertor_t *convertor,
     size_t track = *max_data, iov_track;
     uint32_t i, iov_count = 0;
 
+    char *mem_dst, *mem_src;
+    size_t len;
+
     src = out_iov[iov_count].iov_base;
     iov_track = out_iov[iov_count].iov_len;
     i = convertor->pStack[1].index;
@@ -481,44 +497,56 @@ opal_iovec_unpack( opal_convertor_t *convertor,
         for( i = convertor->pStack[1].index; i < pData->iovcnt; i++ ) {
 restart_unpack:
             if( OPAL_UNLIKELY( iov_track < (iov[i].iov_len - convertor->pStack[1].disp) && iov_track < track ) ){
-                memcpy( dst + (ptrdiff_t)(iov[i].iov_base) + convertor->pStack[1].disp,
-                        src,
-                        iov_track);
+                
+                mem_dst = dst + (ptrdiff_t)(iov[i].iov_base) + convertor->pStack[1].disp;
+                mem_src = src;
+                len = iov_track;
+
                 convertor->pStack[1].disp += iov_track;
                 convertor->pStack[1].index = i;
                 track -= iov_track;
-
+                
                 iov_count++;
-                if( iov_count == *out_size )
-                    goto complete_unpack;
 
                 src = out_iov[iov_count].iov_base;
                 iov_track = out_iov[iov_count].iov_len;
+                
+                memcpy( mem_dst, mem_src, len );
+
+                if( iov_count == *out_size )
+                    goto complete_unpack;
 
                 goto restart_unpack;
             }
 
             if( OPAL_UNLIKELY( track < (iov[i].iov_len - convertor->pStack[1].disp) || track == 0 ) ) {
-                memcpy( dst + (ptrdiff_t)(iov[i].iov_base) + convertor->pStack[1].disp,
-                        src,
-                        track);
+                mem_dst = dst + (ptrdiff_t)(iov[i].iov_base) + convertor->pStack[1].disp;
+                mem_src = src;
+                len = track;
 
                 convertor->pStack[1].disp += track;
                 convertor->pStack[1].index = i;
                 track = 0;
+
+                memcpy( mem_dst, mem_src, len );
+                
                 goto complete_unpack;
             }
 
             if( i+1 != pData->iovcnt )
                 OPAL_PREFETCH( dst + (ptrdiff_t)(iov[(i+1)%(pData->iovcnt)].iov_base) + convertor->pStack[1].disp, 1, 3 );
-            memcpy( dst + (ptrdiff_t)(iov[i].iov_base) + convertor->pStack[1].disp,
-                    src,
-                    iov[i].iov_len - convertor->pStack[1].disp );
-
+            
+            mem_dst = dst + (ptrdiff_t)(iov[i].iov_base) + convertor->pStack[1].disp;
+            mem_src = src;
+            len = iov[i].iov_len - convertor->pStack[1].disp;
+            
             src += iov[i].iov_len - convertor->pStack[1].disp;
             track -= iov[i].iov_len - convertor->pStack[1].disp;
             iov_track -= iov[i].iov_len - convertor->pStack[1].disp;
             convertor->pStack[1].disp = 0;
+
+            memcpy( mem_dst, mem_src, len );
+
         }
 
         convertor->pStack[0].disp += pData->ub - pData->lb;
