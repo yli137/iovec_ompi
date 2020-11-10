@@ -389,7 +389,7 @@ opal_iovec_pack( opal_convertor_t *convertor,
 
     i = convertor->pStack[1].index;
     OPAL_PREFETCH( src + (ptrdiff_t)(iov[i].iov_base) + convertor->pStack[1].disp,
-            0, 0 );
+            0, 3 );
 
     while( convertor->pStack[0].count ){
         for( i = convertor->pStack[1].index; i < pData->iovcnt; i++ ) {
@@ -425,7 +425,7 @@ restart_pack:
             }
 
             if( i + 1 != pData->iovcnt )
-                OPAL_PREFETCH( src + (ptrdiff_t)(iov[i+1].iov_base), 0, 0 );
+                OPAL_PREFETCH( src + (ptrdiff_t)(iov[i+1].iov_base), 0, 3 );
             memcpy( dst,
                     src + (ptrdiff_t)(iov[i].iov_base) + convertor->pStack[1].disp,
                     iov[i].iov_len - convertor->pStack[1].disp );
@@ -442,7 +442,7 @@ restart_pack:
 
         src += pData->ub - pData->lb;
         if( convertor->pStack[0].count )
-            OPAL_PREFETCH( src + (ptrdiff_t)(iov[0].iov_base), 0, 0 );
+            OPAL_PREFETCH( src + (ptrdiff_t)(iov[0].iov_base), 0, 3 );
     
     }
 
