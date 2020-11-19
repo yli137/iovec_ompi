@@ -80,6 +80,13 @@ struct dt_stack_t {
 };
 typedef struct dt_stack_t dt_stack_t;
 
+struct dt_memcpy_t {
+    void* dst;
+    void* src;
+    size_t len;
+};
+typedef struct dt_memcpy_t dt_memcpy_t;
+
 /**
  *
  */
@@ -148,6 +155,31 @@ OPAL_DECLSPEC int32_t opal_large_iovec_unpack( opal_convertor_t *outside_convert
 OPAL_DECLSPEC int32_t opal_convertor_pack( opal_convertor_t* pConv, struct iovec* iov,
                                            uint32_t* out_size, size_t* max_data );
 
+static inline void opal_dtmem_pack_add( dt_memcpy_t *fetch, uint32_t *i, void* dst, void* src, size_t len )
+{
+    if( *i != 0 && (char*)src == (char*)( fetch[*i - 1].src ) + fetch[*i - 1].len ){
+        fetch[*i-1].len += len;
+        return;
+    }
+
+    fetch[*i].dst = dst;
+    fetch[*i].src = src;
+    fetch[*i].len = len;
+    (*i)++;
+}
+
+static inline void opal_dtmem_unpack_add( dt_memcpy_t *fetch, uint32_t *i, void* dst, void* src, size_t len )
+{
+    if( *i != 0 && (char*)dst == (char*)( fetch[*i - 1].dst ) + fetch[*i - 1].len ){
+        fetch[*i-1].len += len;
+        return;
+    }
+
+    fetch[*i].dst = dst;
+    fetch[*i].src = src;
+    fetch[*i].len = len;
+    (*i)++;
+}
 /*
  *
  */
