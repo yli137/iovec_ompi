@@ -285,6 +285,7 @@ int32_t opal_convertor_unpack( opal_convertor_t* pConv,
          * environment. The convertor contain minimal informations, we only
          * use the bConverted to manage the conversion.
          */
+        
         uint32_t i;
         unsigned char* base_pointer;
         size_t pending_length = pConv->local_size - pConv->bConverted;
@@ -396,6 +397,9 @@ opal_convertor_create_stack_at_begining( opal_convertor_t* convertor,
     pStack[0].count = convertor->count;
     pStack[0].disp  = 0;
     pStack[0].type  = OPAL_DATATYPE_LOOP;
+
+    convertor->fetch = malloc( sizeof(dt_memcpy_t) * 32 );
+    convertor->fetch_track = 0;
 
     pStack[1].index = 0;
     pStack[1].disp = 0;

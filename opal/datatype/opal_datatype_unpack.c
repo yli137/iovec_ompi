@@ -188,7 +188,11 @@ opal_unpack_partial_datatype( opal_convertor_t* pConvertor, dt_elem_desc_t* pEle
 
     /* Copy and fill the rest of the buffer with the unused byte */
     memset( temporary, unused_byte, data_length );
-    MEMCPY( temporary + start_position, partial_data, length );
+    //MEMCPY( temporary + start_position, partial_data, length );
+
+    opal_check_and_do_memcpy( pConvertor, 0 );
+    OPAL_PREFETCH( temporary + start_position, 1, LOCALITY );
+    opal_dtmem_unpack_add( pConvertor, temporary + start_position, partial_data, length );
 
 #if OPAL_CUDA_SUPPORT
     /* In the case where the data is being unpacked from device memory, need to
@@ -197,7 +201,11 @@ opal_unpack_partial_datatype( opal_convertor_t* pConvertor, dt_elem_desc_t* pEle
     pConvertor->cbmemcpy(saved_data, user_data, data_length, pConvertor );
 #else
     /* Save the content of the user memory */
-    MEMCPY( saved_data, user_data, data_length );
+    //MEMCPY( saved_data, user_data, data_length );
+
+    opal_check_and_do_memcpy( pConvertor, 0 );
+    OPAL_PREFETCH( saved_data, 1, LOCALITY );
+    opal_dtmem_unpack_add( pConvertor, saved_data, user_data, data_length );
 #endif
 
     /* Then unpack the data into the user memory */
@@ -224,9 +232,12 @@ opal_unpack_partial_datatype( opal_convertor_t* pConvertor, dt_elem_desc_t* pEle
         }
     }
 #else
+    opal_check_and_do_memcpy( pConvertor, 1 );
     for(size_t i = 0; i < data_length; i++ ) {
-        if( unused_byte == user_data[i] )
+        if( unused_byte == user_data[i] ){
             user_data[i] = saved_data[i];
+        }
+
     }
 #endif
 }
@@ -379,6 +390,9 @@ opal_generic_simple_unpack_function( opal_convertor_t* pConvertor,
             }
         }
     complete_loop:
+        
+        opal_check_and_do_memcpy( pConvertor, 1 );
+        
         assert( pElem->elem.common.type < OPAL_DATATYPE_MAX_PREDEFINED );
         if( 0 != iov_len_local ) {
             unsigned char* temp = conv_ptr;
@@ -399,6 +413,7 @@ opal_generic_simple_unpack_function( opal_convertor_t* pConvertor,
         iov[iov_count].iov_len -= iov_len_local;  /* update the amount of valid data */
         total_unpacked += iov[iov_count].iov_len;
     }
+
     *max_data = total_unpacked;
     pConvertor->bConverted += total_unpacked;  /* update the already converted bytes */
     *out_size = iov_count;

@@ -26,6 +26,8 @@
 #define OPAL_CONVERTOR_H_HAS_BEEN_INCLUDED
 
 #include "opal_config.h"
+#include <string.h>
+#include <stdio.h>
 
 #ifdef HAVE_SYS_UIO_H
 #include <sys/uio.h>
@@ -80,6 +82,13 @@ struct dt_stack_t {
 };
 typedef struct dt_stack_t dt_stack_t;
 
+struct dt_memcpy_t {
+    void* dst;
+    void* src;
+    size_t len;
+};
+typedef struct dt_memcpy_t dt_memcpy_t;
+
 /**
  *
  */
@@ -114,6 +123,9 @@ struct opal_convertor_t {
     uint32_t                      csum_ui1;       /**< partial checksum computed by pack/unpack operation */
     size_t                        csum_ui2;       /**< partial checksum computed by pack/unpack operation */
 
+    dt_memcpy_t*                  fetch;
+    uint32_t                      fetch_track;
+
     /* --- fields are no more aligned on cacheline --- */
     dt_stack_t                    static_stack[DT_STATIC_STACK_SIZE];  /**< local stack for small datatypes */
 
@@ -145,6 +157,47 @@ OPAL_DECLSPEC int32_t opal_convertor_pack( opal_convertor_t* pConv, struct iovec
  */
 OPAL_DECLSPEC int32_t opal_convertor_unpack( opal_convertor_t* pConv, struct iovec* iov,
                                              uint32_t* out_size, size_t* max_data );
+
+static inline void opal_dtmem_pack_add( opal_convertor_t *conv, void* dst, void* src, size_t len )
+{
+    if( conv->fetch_track != 0 && (char*)src == (char*)( conv->fetch[conv->fetch_track - 1].src ) + conv->fetch[conv->fetch_track - 1].len ){
+        conv->fetch[conv->fetch_track-1].len += len;
+        return;
+    }
+
+    conv->fetch[conv->fetch_track].dst = dst;
+    conv->fetch[conv->fetch_track].src = src;
+    conv->fetch[conv->fetch_track].len = len;
+    (conv->fetch_track)++;
+}
+
+static inline void opal_dtmem_unpack_add( opal_convertor_t *conv, void* dst, void* src, size_t len )
+{
+    if( conv->fetch_track != 0 && (char*)dst == (char*)( conv->fetch[conv->fetch_track - 1].dst ) + conv->fetch[conv->fetch_track - 1].len ){
+        conv->fetch[conv->fetch_track-1].len += len;
+        return;
+    }
+
+    conv->fetch[conv->fetch_track].dst = dst;
+    conv->fetch[conv->fetch_track].src = src;
+    conv->fetch[conv->fetch_track].len = len;
+    (conv->fetch_track)++;
+}
+
+#define LIMIT 12
+static inline void opal_do_memcpy( opal_convertor_t *conv )
+{
+    for( uint32_t i = 0; i < conv->fetch_track; i++ )
+        memcpy( conv->fetch[i].dst, conv->fetch[i].src, conv->fetch[i].len );
+    conv->fetch_track = 0;
+}
+
+static inline void opal_check_and_do_memcpy( opal_convertor_t *conv, uint32_t i )
+{
+    if( conv->fetch_track >= LIMIT || i == 1 ){
+        opal_do_memcpy( conv );
+    }
+}
 
 /*
  *
