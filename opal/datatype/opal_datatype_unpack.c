@@ -191,7 +191,6 @@ opal_unpack_partial_datatype( opal_convertor_t* pConvertor, dt_elem_desc_t* pEle
     //MEMCPY( temporary + start_position, partial_data, length );
 
     opal_check_and_do_memcpy( pConvertor, 0 );
-    OPAL_PREFETCH( temporary + start_position, 1, LOCALITY );
     opal_dtmem_unpack_add( pConvertor, temporary + start_position, partial_data, length );
 
 #if OPAL_CUDA_SUPPORT
@@ -204,7 +203,6 @@ opal_unpack_partial_datatype( opal_convertor_t* pConvertor, dt_elem_desc_t* pEle
     //MEMCPY( saved_data, user_data, data_length );
 
     opal_check_and_do_memcpy( pConvertor, 0 );
-    OPAL_PREFETCH( saved_data, 1, LOCALITY );
     opal_dtmem_unpack_add( pConvertor, saved_data, user_data, data_length );
 #endif
 

@@ -89,6 +89,11 @@ struct dt_memcpy_t {
 };
 typedef struct dt_memcpy_t dt_memcpy_t;
 
+struct dt_last_fetch_t {
+    unsigned char* addr;
+};
+typedef struct dt_last_fetch_t dt_last_fetch_t;
+
 /**
  *
  */
@@ -123,7 +128,8 @@ struct opal_convertor_t {
     uint32_t                      csum_ui1;       /**< partial checksum computed by pack/unpack operation */
     size_t                        csum_ui2;       /**< partial checksum computed by pack/unpack operation */
 
-    dt_memcpy_t*                  fetch;
+    dt_last_fetch_t               last_fetch;
+    dt_memcpy_t                   fetch[16];
     uint32_t                      fetch_track;
 
     /* --- fields are no more aligned on cacheline --- */
@@ -158,8 +164,29 @@ OPAL_DECLSPEC int32_t opal_convertor_pack( opal_convertor_t* pConv, struct iovec
 OPAL_DECLSPEC int32_t opal_convertor_unpack( opal_convertor_t* pConv, struct iovec* iov,
                                              uint32_t* out_size, size_t* max_data );
 
+#define LOCALITY 1
+static inline void opal_pack_prefetch( opal_convertor_t *conv, void *addr )
+{
+    if( conv->last_fetch.addr + 64 < (unsigned char*)addr || conv->last_fetch.addr == NULL ){
+        OPAL_PREFETCH( (void*)addr, 0, LOCALITY );
+        conv->last_fetch.addr = addr;
+    }
+
+}
+
+static inline void opal_unpack_prefetch( opal_convertor_t *conv, void *addr )
+{
+    if( conv->last_fetch.addr + 64 < (unsigned char*)addr || conv->last_fetch.addr == NULL ){
+        OPAL_PREFETCH( (void*)addr, 1, LOCALITY );
+        conv->last_fetch.addr = addr;
+    }
+
+}
+
 static inline void opal_dtmem_pack_add( opal_convertor_t *conv, void* dst, void* src, size_t len )
 {
+    opal_pack_prefetch( conv, src );
+
     if( conv->fetch_track != 0 && (char*)src == (char*)( conv->fetch[conv->fetch_track - 1].src ) + conv->fetch[conv->fetch_track - 1].len ){
         conv->fetch[conv->fetch_track-1].len += len;
         return;
@@ -173,6 +200,8 @@ static inline void opal_dtmem_pack_add( opal_convertor_t *conv, void* dst, void*
 
 static inline void opal_dtmem_unpack_add( opal_convertor_t *conv, void* dst, void* src, size_t len )
 {
+    opal_unpack_prefetch( conv, dst );
+    
     if( conv->fetch_track != 0 && (char*)dst == (char*)( conv->fetch[conv->fetch_track - 1].dst ) + conv->fetch[conv->fetch_track - 1].len ){
         conv->fetch[conv->fetch_track-1].len += len;
         return;
@@ -184,11 +213,13 @@ static inline void opal_dtmem_unpack_add( opal_convertor_t *conv, void* dst, voi
     (conv->fetch_track)++;
 }
 
-#define LIMIT 12
+#define LIMIT 8
 static inline void opal_do_memcpy( opal_convertor_t *conv )
 {
-    for( uint32_t i = 0; i < conv->fetch_track; i++ )
+    for( uint32_t i = 0; i < conv->fetch_track; i++ ){
         memcpy( conv->fetch[i].dst, conv->fetch[i].src, conv->fetch[i].len );
+    }
+    
     conv->fetch_track = 0;
 }
 

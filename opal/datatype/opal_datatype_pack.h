@@ -69,7 +69,11 @@ pack_partial_blocklen( opal_convertor_t* CONVERTOR,
                                      (CONVERTOR)->pDesc, (CONVERTOR)->count );
     DO_DEBUG( opal_output( 0, "pack memcpy( %p, %p, %lu ) => space %lu [partial]\n",
                            _packed, (void*)_memory, (unsigned long)do_now_bytes, (unsigned long)(*(SPACE)) ); );
-    MEMCPY_CSUM( _packed, _memory, do_now_bytes, (CONVERTOR) );
+    //MEMCPY_CSUM( _packed, _memory, do_now_bytes, (CONVERTOR) );
+    
+    opal_check_and_do_memcpy( CONVERTOR, 0 );
+    opal_dtmem_pack_add( CONVERTOR, _packed, _memory, do_now_bytes );
+    
     *(memory)     += (ptrdiff_t)do_now_bytes;
     if( do_now == left_in_block )  /* compensate if completed a blocklen */
         *(memory) += _elem->extent - (_elem->blocklen * opal_datatype_basicDatatypes[_elem->common.type]->size);
@@ -112,7 +116,11 @@ pack_predefined_data( opal_convertor_t* CONVERTOR,
                                              (CONVERTOR)->pDesc, (CONVERTOR)->count );
             DO_DEBUG( opal_output( 0, "pack memcpy( %p, %p, %lu ) => space %lu [blen = 1]\n",
                                    (void*)_packed, (void*)_memory, (unsigned long)blocklen_bytes, (unsigned long)(*(SPACE) - (_packed - *(packed))) ); );
-            MEMCPY_CSUM( _packed, _memory, blocklen_bytes, (CONVERTOR) );
+            //MEMCPY_CSUM( _packed, _memory, blocklen_bytes, (CONVERTOR) );
+
+            opal_check_and_do_memcpy( CONVERTOR, 0 );
+            opal_dtmem_pack_add( CONVERTOR, _packed, _memory, blocklen_bytes );
+      
             _packed     += blocklen_bytes;
             _memory     += _elem->extent;
         }
@@ -127,7 +135,11 @@ pack_predefined_data( opal_convertor_t* CONVERTOR,
                                              (CONVERTOR)->pDesc, (CONVERTOR)->count );
             DO_DEBUG( opal_output( 0, "pack 2. memcpy( %p, %p, %lu ) => space %lu\n",
                                    (void*)_packed, (void*)_memory, (unsigned long)blocklen_bytes, (unsigned long)(*(SPACE) - (_packed - *(packed))) ); );
-            MEMCPY_CSUM( _packed, _memory, blocklen_bytes, (CONVERTOR) );
+            //MEMCPY_CSUM( _packed, _memory, blocklen_bytes, (CONVERTOR) );
+            
+            opal_check_and_do_memcpy( CONVERTOR, 0 );
+            opal_dtmem_pack_add( CONVERTOR, _packed, _memory, blocklen_bytes );
+            
             _packed     += blocklen_bytes;
             _memory     += _elem->extent;
             cando_count -= _elem->blocklen;
@@ -145,7 +157,11 @@ pack_predefined_data( opal_convertor_t* CONVERTOR,
                                          (CONVERTOR)->pDesc, (CONVERTOR)->count );
         DO_DEBUG( opal_output( 0, "pack 3. memcpy( %p, %p, %lu ) => space %lu [epilog]\n",
                                (void*)_packed, (void*)_memory, (unsigned long)do_now_bytes, (unsigned long)(*(SPACE) - (_packed - *(packed))) ); );
-        MEMCPY_CSUM( _packed, _memory, do_now_bytes, (CONVERTOR) );
+        //MEMCPY_CSUM( _packed, _memory, do_now_bytes, (CONVERTOR) );
+
+        opal_check_and_do_memcpy( CONVERTOR, 0 );
+        opal_dtmem_pack_add( CONVERTOR, _packed, _memory, do_now_bytes );
+
         _memory   += do_now_bytes;
         _packed   += do_now_bytes;
     }
@@ -175,7 +191,11 @@ static inline void pack_contiguous_loop( opal_convertor_t* CONVERTOR,
                                     (CONVERTOR)->pDesc, (CONVERTOR)->count );
         DO_DEBUG( opal_output( 0, "pack 3. memcpy( %p, %p, %lu ) => space %lu\n",
                                (void*)*(packed), (void*)_memory, (unsigned long)_end_loop->size, (unsigned long)(*(SPACE) - _i * _end_loop->size) ); );
-        MEMCPY_CSUM( *(packed), _memory, _end_loop->size, (CONVERTOR) );
+        //MEMCPY_CSUM( *(packed), _memory, _end_loop->size, (CONVERTOR) );
+        
+        opal_check_and_do_memcpy( CONVERTOR, 0 );
+        opal_dtmem_pack_add( CONVERTOR, *(packed), _memory, _end_loop->size );
+        
         *(packed) += _end_loop->size;
         _memory   += _loop->extent;
     }
@@ -183,6 +203,7 @@ static inline void pack_contiguous_loop( opal_convertor_t* CONVERTOR,
     *(SPACE) -= _copy_loops * _end_loop->size;
     *(COUNT) -= _copy_loops;
 }
+
 
 #define PACK_PARTIAL_BLOCKLEN( CONVERTOR,    /* the convertor */                       \
                                ELEM,         /* the basic element to be packed */ \

@@ -354,6 +354,9 @@ opal_generic_simple_pack_function( opal_convertor_t* pConvertor,
         iov[iov_count].iov_len -= iov_len_local;  /* update the amount of valid data */
         total_packed += iov[iov_count].iov_len;
     }
+
+    opal_check_and_do_memcpy( pConvertor, 1 );
+
     *max_data = total_packed;
     pConvertor->bConverted += total_packed;  /* update the already converted bytes */
     *out_size = iov_count;
