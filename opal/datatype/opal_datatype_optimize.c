@@ -310,5 +310,16 @@ int32_t opal_datatype_commit( opal_datatype_t * pData )
         pLast->first_elem_disp = first_elem_disp;
         pLast->size            = pData->size;
     }
+
+    dt_elem_desc_t *desc1 = pData->opt_desc.desc;
+    size_t length1 = pData->opt_desc.used;
+    uint32_t check = 0, i1, data = 0;
+
+    for( i1 = 0; i1 < length1; i1++ ){
+        if( desc1[i1].elem.common.flags & OPAL_DATATYPE_FLAG_DATA ){
+            desc1[i1].elem.gathercount = 0;
+        }
+    }
+
     return OPAL_SUCCESS;
 }

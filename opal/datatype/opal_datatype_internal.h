@@ -160,6 +160,7 @@ struct ddt_elem_desc {
     size_t                  count;            /**< number of blocks */
     ptrdiff_t               extent;           /**< extent of each block (in bytes) */
     ptrdiff_t               disp;             /**< displacement of the first block */
+    size_t                  gathercount;
 };
 typedef struct ddt_elem_desc ddt_elem_desc_t;
 

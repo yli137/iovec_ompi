@@ -46,6 +46,9 @@
 
 static void opal_convertor_construct( opal_convertor_t* convertor )
 {
+
+    convertor->fused          = 0;
+
     convertor->pStack         = convertor->static_stack;
     convertor->stack_size     = DT_STATIC_STACK_SIZE;
     convertor->partial_length = 0;
@@ -208,6 +211,69 @@ opal_convertor_t* opal_convertor_create( int32_t remote_arch, int32_t mode )
         (CONVERTOR)->csum_ui2 = 0;                                      \
         assert( (CONVERTOR)->bConverted < (CONVERTOR)->local_size );    \
     } while(0)
+
+int32_t
+opal_datatype_gather_pack( const dt_elem_desc_t elem, const dt_for_count_t *stack,
+                           size_t donum, unsigned char *dst, const unsigned char *src )
+{
+    return 1;
+}
+
+int32_t
+opal_generic_gather_pack_function( opal_convertor_t* pConvertor,
+                                   struct iovec* iov, uint32_t* out_size,
+                                   size_t* max_data )
+{
+    const opal_datatype_t *pData = pConvertor->pDesc;
+
+    size_t nddt = *max_data / pData->size;
+    size_t leftover = *max_data % pData->size;
+
+    dt_elem_desc_t *desc = pData->opt_desc.desc;
+    size_t nelem = pData->opt_desc.used;
+    size_t eStack[nelem];
+
+    unsigned char *dst = iov[0].iov_base,
+         *src = pConvertor->pBaseBuf + pConvertor->pStack[0].disp;
+    
+    uint32_t i;
+    for( i = 0; i < nelem; i++ ){
+        eStack[i] = nddt;
+    }
+
+    for( i = 0; i < nelem; i++ ){
+        if( desc[i].elem.common.flags == OPAL_DATATYPE_END_LOOP ){
+            
+            (pConvertor->fused)--;
+            continue;
+
+        } else if( desc[i].elem.common.flags == OPAL_DATATYPE_LOOP ){
+            
+            (pConvertor->fStack)[pConvertor->fused].count = desc[i].loop.loops;
+            (pConvertor->fStack)[pConvertor->fused].extent = desc[i].loop.extent;
+            (pConvertor->fused)++;
+            continue;
+
+        } else if( desc[i].elem.common.flags & OPAL_DATATYPE_FLAG_DATA ){
+
+            opal_datatype_gather_pack( desc[i], &(pConvertor->fStack[0]), eStack[i], dst, src );
+
+        }
+
+        pConvertor->pStack[0].disp += pData->ub - pData->lb;
+        pConvertor->pStack[1].index = 0;
+        pConvertor->pStack[0].count--;
+        src += pData->ub - pData->lb;
+
+        break;
+    }
+
+    pConvertor->bConverted += *max_data;
+
+    pConvertor->flags |= CONVERTOR_COMPLETED;
+    return 1;
+
+}
 
 /**
  * Return 0 if everything went OK and if there is still room before the complete
@@ -406,6 +472,7 @@ opal_convertor_create_stack_at_begining( opal_convertor_t* convertor,
         pStack[1].count = pElems[0].elem.count * pElems[0].elem.blocklen;
         pStack[1].type  = pElems[0].elem.common.type;
     }
+
     return OPAL_SUCCESS;
 }
 
@@ -646,7 +713,7 @@ int32_t opal_convertor_prepare_for_send( opal_convertor_t* convertor,
                 else
                     convertor->fAdvance = opal_pack_homogeneous_contig_with_gaps;
             } else {
-                convertor->fAdvance = opal_generic_simple_pack;
+                convertor->fAdvance = opal_generic_gather_pack_function;
             }
         }
     return OPAL_SUCCESS;

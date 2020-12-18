@@ -80,6 +80,12 @@ struct dt_stack_t {
 };
 typedef struct dt_stack_t dt_stack_t;
 
+struct dt_for_count_t {
+    uint32_t          count;
+    ptrdiff_t         extent;
+};
+typedef struct dt_for_count_t dt_for_count_t;
+
 /**
  *
  */
@@ -100,6 +106,9 @@ struct opal_convertor_t {
     unsigned char*                pBaseBuf;       /**< initial buffer as supplied by the user */
     dt_stack_t*                   pStack;         /**< the local stack for the actual conversion */
     convertor_advance_fct_t       fAdvance;       /**< pointer to the pack/unpack functions */
+
+    dt_for_count_t                fStack[10];
+    uint32_t                      fused;
 
     /* --- cacheline boundary (96 bytes - if 64bits arch and !OPAL_ENABLE_DEBUG) --- */
     struct opal_convertor_master_t* master;       /**< the master convertor */
@@ -145,6 +154,15 @@ OPAL_DECLSPEC int32_t opal_convertor_pack( opal_convertor_t* pConv, struct iovec
  */
 OPAL_DECLSPEC int32_t opal_convertor_unpack( opal_convertor_t* pConv, struct iovec* iov,
                                              uint32_t* out_size, size_t* max_data );
+
+OPAL_DECLSPEC int32_t opal_datatype_gather_pack( const dt_elem_desc_t elem, 
+                                                 const dt_for_count_t *stack,
+                                                 size_t donum, unsigned char *dst, 
+                                                 const unsigned char *src );
+
+OPAL_DECLSPEC int32_t opal_generic_gather_pack_function( opal_convertor_t* pConvertor,
+                                             struct iovec* iov, uint32_t* out_size,
+                                             size_t* max_data );
 
 /*
  *
