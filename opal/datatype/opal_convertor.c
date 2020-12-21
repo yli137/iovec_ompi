@@ -212,11 +212,79 @@ opal_convertor_t* opal_convertor_create( int32_t remote_arch, int32_t mode )
         assert( (CONVERTOR)->bConverted < (CONVERTOR)->local_size );    \
     } while(0)
 
-int32_t
-opal_datatype_gather_pack( const dt_elem_desc_t elem, const dt_for_count_t *stack,
-                           size_t donum, unsigned char *dst, const unsigned char *src )
+size_t
+opal_datatype_gather_pack0( opal_convertor_t* conv, size_t donum,
+                            const unsigned char *odst, const unsigned char *osrc )
 {
+    opal_datatype_t *pData = conv->pDesc;
+    const ddt_elem_desc_t* _elem = &(pData->opt_desc.desc->elem);
+    size_t _bytes = opal_datatype_basicDatatypes[_elem->common.type]->size;
+
+    uint32_t fused = conv->fused;
+
+    unsigned char *dst = odst, *src = osrc;
+
+    size_t i, j;
+    for( i = 0; i < donum; i++ ){
+
+        for( j = 0; j < _elem->count; j++ ){
+            memcpy( dst, src + _elem->extent * j, _bytes );
+            dst += _bytes;
+        }
+
+        src += pData->ub - pData->lb;
+    }
+
     return 1;
+}
+
+size_t
+opal_datatype_gather_pack1( opal_convertor_t* conv, size_t donum,
+                            const unsigned char *odst, const unsigned char *osrc )
+{
+    opal_datatype_t *pData = conv->pDesc;
+    const ddt_elem_desc_t* _elem = &(pData->opt_desc.desc->elem);
+    size_t _bytes = opal_datatype_basicDatatypes[_elem->common.type]->size;
+
+    uint32_t fused = conv->fused;
+
+    unsigned char *dst = odst, *src = osrc;
+
+    size_t i, j, k;
+    for( i = 0; i < donum; i++ ){
+
+        unsigned char *local_dst = dst, *local_src = src;
+        for( k = 0; k < conv->fStack[0].count; k++ ){
+            
+            for( j = 0; j < _elem->count; j++ ){
+                memcpy( local_dst, local_src + _elem->extent * j, _bytes );
+                local_dst += _bytes;
+            }
+
+            local_src += conv->fStack[0].extent;
+        }
+
+        src += pData->ub - pData->lb;
+    }
+
+    return 1;
+}
+
+size_t
+opal_datatype_gather_pack( opal_convertor_t* conv, size_t donum, 
+                           const unsigned char *odst, const unsigned char *osrc )
+{
+    uint32_t fused = conv->fused;
+    size_t rc;
+
+    switch( fused ){
+        case 0:
+            rc = opal_datatype_gather_pack0( conv, donum, odst, osrc );
+            return rc;
+        case 1:
+            rc = opal_datatype_gather_pack1( conv, donum, odst, osrc );
+            return rc;
+    }
 }
 
 int32_t
@@ -256,20 +324,13 @@ opal_generic_gather_pack_function( opal_convertor_t* pConvertor,
 
         } else if( desc[i].elem.common.flags & OPAL_DATATYPE_FLAG_DATA ){
 
-            opal_datatype_gather_pack( desc[i], &(pConvertor->fStack[0]), eStack[i], dst, src );
+            opal_datatype_gather_pack( pConvertor, eStack[i], dst, src );
 
         }
 
-        pConvertor->pStack[0].disp += pData->ub - pData->lb;
-        pConvertor->pStack[1].index = 0;
-        pConvertor->pStack[0].count--;
-        src += pData->ub - pData->lb;
-
-        break;
     }
 
     pConvertor->bConverted += *max_data;
-
     pConvertor->flags |= CONVERTOR_COMPLETED;
     return 1;
 

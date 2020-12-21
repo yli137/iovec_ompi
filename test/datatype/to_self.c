@@ -524,6 +524,7 @@ int main( int argc, char* argv[] )
     }
 
     if( run_tests & DO_CONTIG ) {
+        /*
         printf( "\n! contiguous datatype\n\n" );
         do_test_for_ddt( run_tests, MPI_INT, MPI_INT, MAX_LENGTH );
 
@@ -562,6 +563,7 @@ int main( int argc, char* argv[] )
         MPI_Type_commit( &ddt );
         do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH ); 
         MPI_Type_free( &ddt );
+        */
 
         printf( "\n! indexed gap\n\n" );
         ddt = create_indexed_gap_ddt();
@@ -575,6 +577,7 @@ int main( int argc, char* argv[] )
         do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
         MPI_Type_free( &ddt );
 
+        /*
         for( int i = 1; i < 15; i++ ){
             printf("\n! Random indexed ddt indexed(512, %d, 16, MPI_DOUBLE)\n\n", i);
 
@@ -598,7 +601,7 @@ int main( int argc, char* argv[] )
             matrix_unpack( run_tests, ddt, ddt, MAX_LENGTH );
             MPI_Type_free( &ddt );
         }
-
+        */
     }
 
     MPI_Finalize();
