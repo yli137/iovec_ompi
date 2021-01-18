@@ -218,6 +218,14 @@ int opal_convertor_generic_simple_position( opal_convertor_t* pConvertor,
     }
     while( 1 ) {
         if( OPAL_DATATYPE_END_LOOP == pElem->elem.common.type ) { /* end of the the entire datatype */
+
+            /**********************/
+            if( pConvertor->fused != 0 ){
+                pConvertor->fStack[ pConvertor->fused - 1 ].count--;
+                if( pConvertor->fStack[ pConvertor->fused - 1 ].count == 0 )
+                    pConvertor->fused--;
+            }
+            /**********************/
             DO_DEBUG( opal_output( 0, "position end_loop count %" PRIsize_t " stack_pos %d pos_desc %d disp %lx space %lu\n",
                                    pStack->count, pConvertor->stack_pos, pos_desc,
                                    pStack->disp, (unsigned long)iov_len_local ); );
@@ -247,6 +255,14 @@ int opal_convertor_generic_simple_position( opal_convertor_t* pConvertor,
                                    pStack->disp, (unsigned long)iov_len_local ); );
         }
         if( OPAL_DATATYPE_LOOP == pElem->elem.common.type ) {
+
+            /**********************/
+            pConvertor->fStack[ pConvertor->fused ].count = pElem->loop.loops;
+            pConvertor->fStack[ pConvertor->fused ].extent = pElem->loop.extent;
+            pConvertor->fStack[ pConvertor->fused ].size = pElem->loop.size;
+            pConvertor->fused++;
+            /**********************/
+    
             ptrdiff_t local_disp = (ptrdiff_t)base_pointer;
             ddt_endloop_desc_t* end_loop = (ddt_endloop_desc_t*)(pElem + pElem->loop.items);
             size_t full_loops = iov_len_local / end_loop->size;

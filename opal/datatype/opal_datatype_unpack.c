@@ -282,7 +282,7 @@ opal_generic_simple_unpack_function( opal_convertor_t* pConvertor,
     for( iov_count = 0; iov_count < (*out_size); iov_count++ ) {
         iov_ptr = (unsigned char *) iov[iov_count].iov_base;
         iov_len_local = iov[iov_count].iov_len;
-        
+
         if( 0 != pConvertor->partial_length ) {
             size_t element_length = opal_datatype_basicDatatypes[pElem->elem.common.type]->size;
             size_t missing_length = element_length - pConvertor->partial_length;
@@ -385,6 +385,7 @@ opal_generic_simple_unpack_function( opal_convertor_t* pConvertor,
             /* We have some partial data here. Let's copy it into the convertor
              * and keep it hot until the next round.
              */
+
             assert( iov_len_local < opal_datatype_basicDatatypes[pElem->elem.common.type]->size );
             COMPUTE_CSUM( iov_ptr, iov_len_local, pConvertor );
 

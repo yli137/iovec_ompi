@@ -24,6 +24,7 @@
 #include "opal_config.h"
 
 #include <stddef.h>
+#include <stdio.h>
 
 #include "opal/datatype/opal_convertor_internal.h"
 #include "opal/datatype/opal_datatype_internal.h"

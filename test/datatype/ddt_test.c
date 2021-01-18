@@ -352,6 +352,8 @@ int main( int argc, char* argv[] )
     remote_arch = opal_local_arch;
     printf( "\n\n#\n * TEST INVERSED VECTOR\n #\n\n" );
     pdt = create_inversed_vector( &ompi_mpi_int.dt, 10 );
+    
+    ompi_datatype_dump( pdt );
     if( outputFlags & CHECK_PACK_UNPACK ) {
         local_copy_ddt_count(pdt, 100);
         local_copy_with_convertor(pdt, 100, 956);

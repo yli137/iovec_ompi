@@ -37,6 +37,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <unistd.h>
+
 /* Compile with:
 gcc -DHAVE_CONFIG_H -I. -I../../include -I../.. -I../../include -I../../../ompi-trunk/opal -I../../../ompi-trunk/orte -g opal_datatype_test.c -o opal_datatype_test
 */
@@ -499,6 +501,7 @@ static int local_copy_with_convertor( opal_datatype_t const * const pdt, int cou
  */
 int main( int argc, char* argv[] )
 {
+    //sleep(60);
     opal_datatype_t *pdt, *pdt1, *pdt2, *pdt3;
     int rc, length = 500;
 

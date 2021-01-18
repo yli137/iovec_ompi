@@ -313,13 +313,33 @@ int32_t opal_datatype_commit( opal_datatype_t * pData )
 
     dt_elem_desc_t *desc1 = pData->opt_desc.desc;
     size_t length1 = pData->opt_desc.used;
-    uint32_t check = 0, i1, data = 0;
+    uint32_t check = 0, i1, p;
+    size_t data_size = 0;
 
-    for( i1 = 0; i1 < length1; i1++ ){
-        if( desc1[i1].elem.common.flags & OPAL_DATATYPE_FLAG_DATA ){
-            desc1[i1].elem.gathercount = 0;
+    for( i1 = 0, p = 0; i1 < length1; i1++ ){
+        if( desc1[i1].elem.common.type == OPAL_DATATYPE_END_LOOP ){
+            if( p != 0 )
+                desc1[p-1].loop.size = desc1[i1].end_loop.size;
+        } else if( desc1[i1].elem.common.type == OPAL_DATATYPE_LOOP ){
+            p++;
         }
     }
+
+    /*
+       for( i1 = 0; i1 < length1; i1++ ){
+       if( desc1[i1].elem.common.type == OPAL_DATATYPE_END_LOOP ){
+       printf("end_loop size %zu\n",
+       desc1[i1].end_loop.size);
+       } else if( desc1[i1].elem.common.type == OPAL_DATATYPE_LOOP ){
+       printf("loop_start count %zu size %zu extent %zu\n",
+       desc1[i1].loop.loops,
+       desc1[i1].loop.size,
+       desc1[i1].loop.extent);
+       } else if( desc1[i1].elem.common.flags & OPAL_DATATYPE_FLAG_DATA ){
+       printf("data\n");
+       }
+       }
+       */
 
     return OPAL_SUCCESS;
 }

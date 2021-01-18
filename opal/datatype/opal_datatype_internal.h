@@ -160,7 +160,6 @@ struct ddt_elem_desc {
     size_t                  count;            /**< number of blocks */
     ptrdiff_t               extent;           /**< extent of each block (in bytes) */
     ptrdiff_t               disp;             /**< displacement of the first block */
-    size_t                  gathercount;
 };
 typedef struct ddt_elem_desc ddt_elem_desc_t;
 
@@ -178,6 +177,7 @@ struct ddt_loop_desc {
     uint32_t                loops;            /**< number of elements */
     size_t                  unused;           /**< not used right now */
     ptrdiff_t               extent;           /**< extent of the whole loop */
+    size_t                  size;
 };
 typedef struct ddt_loop_desc ddt_loop_desc_t;
 

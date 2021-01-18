@@ -17,6 +17,8 @@
 #include "ompi_config.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #include "opal/datatype/opal_convertor.h"
 #include "ompi/datatype/ompi_datatype.h"
@@ -208,6 +210,8 @@ int main( int argc, char* argv[] )
     ompi_datatype_create_vector(NELT/2, 1, 2, MPI_INT, &datatype);
     ompi_datatype_commit(&datatype);
 
+    ompi_datatype_dump( datatype );
+
 #if (OPAL_ENABLE_DEBUG == 1) && (OPAL_C_HAVE_VISIBILITY == 0)
     opal_ddt_unpack_debug   = false;
     opal_ddt_pack_debug     = false;
@@ -218,7 +222,7 @@ int main( int argc, char* argv[] )
                      &segments, &seg_count );
 
     /* shuffle the segments */
-    shuffle_segments( segments, seg_count );
+//    shuffle_segments( segments, seg_count );
 
     /* pack the data */
     pack_segments( datatype, 1, fragment_size, segments, seg_count,

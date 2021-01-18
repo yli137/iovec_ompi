@@ -83,8 +83,15 @@ typedef struct dt_stack_t dt_stack_t;
 struct dt_for_count_t {
     uint32_t          count;
     ptrdiff_t         extent;
+    size_t            size;
 };
 typedef struct dt_for_count_t dt_for_count_t;
+
+struct dt_estack_elem_t {
+    size_t nelem;
+    int32_t last;
+};
+typedef struct dt_estack_elem_t dt_estack_elem_t;
 
 /**
  *
@@ -109,6 +116,7 @@ struct opal_convertor_t {
 
     dt_for_count_t                fStack[10];
     uint32_t                      fused;
+    dt_estack_elem_t              *eStack;
 
     /* --- cacheline boundary (96 bytes - if 64bits arch and !OPAL_ENABLE_DEBUG) --- */
     struct opal_convertor_master_t* master;       /**< the master convertor */
@@ -155,21 +163,25 @@ OPAL_DECLSPEC int32_t opal_convertor_pack( opal_convertor_t* pConv, struct iovec
 OPAL_DECLSPEC int32_t opal_convertor_unpack( opal_convertor_t* pConv, struct iovec* iov,
                                              uint32_t* out_size, size_t* max_data );
 
-OPAL_DECLSPEC size_t opal_datatype_gather_pack( opal_convertor_t* conv,
-                                                 size_t donum, const unsigned char *dst, 
-                                                 const unsigned char *src );
 
 OPAL_DECLSPEC int32_t opal_generic_gather_pack_function( opal_convertor_t* pConvertor,
                                              struct iovec* iov, uint32_t* out_size,
                                              size_t* max_data );
 
-OPAL_DECLSPEC size_t opal_datatype_gather_pack0( opal_convertor_t* conv,
-                                                 size_t donum, const unsigned char *dst, 
-                                                 const unsigned char *src );
+OPAL_DECLSPEC size_t opal_convertor_decide_gather( opal_convertor_t* conv, uint32_t i, dt_for_count_t forloop[10],
+                                                   uint32_t fc, char *dst, char *src, size_t *max_data, size_t donum );
 
-OPAL_DECLSPEC size_t opal_datatype_gather_pack1( opal_convertor_t* conv,
-                                                 size_t donum, const unsigned char *dst, 
-                                                 const unsigned char *src );
+OPAL_DECLSPEC size_t opal_convertor_do_gather( opal_convertor_t* conv, uint32_t i,
+                                               char *dst, char *src, size_t *max_data, 
+                                               size_t donum );
+
+OPAL_DECLSPEC size_t opal_run_through_last( opal_convertor_t *pConvertor,
+                                            char *dst, char *src,
+                                            size_t *leftover );
+
+OPAL_DECLSPEC int32_t opal_run_through( opal_convertor_t *pConvertor,
+                                        char *dst, char *src,
+                                        size_t *leftover, size_t donum);
 
 /*
  *
