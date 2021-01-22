@@ -494,7 +494,7 @@ opal_generic_gather_pack_function( opal_convertor_t* pConvertor,
     leftover = *max_data;
     pConvertor->pStack[1].disp = disp_hold;
 
-    size_t do_num = 32000 / (pData->ub - pData->lb);
+    size_t do_num = 64000 / (pData->ub - pData->lb);
     if( do_num > pConvertor->count )
         do_num = pConvertor->count;
 
