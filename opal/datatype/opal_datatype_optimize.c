@@ -325,6 +325,8 @@ int32_t opal_datatype_commit( opal_datatype_t * pData )
         }
     }
 
+
+
     /*
        for( i1 = 0; i1 < length1; i1++ ){
        if( desc1[i1].elem.common.type == OPAL_DATATYPE_END_LOOP ){

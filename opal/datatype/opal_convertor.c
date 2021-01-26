@@ -494,14 +494,13 @@ opal_generic_gather_pack_function( opal_convertor_t* pConvertor,
     leftover = *max_data;
     pConvertor->pStack[1].disp = disp_hold;
 
-    size_t do_num = 64000 / (pData->ub - pData->lb);
+    size_t do_num = 256000 / pData->size; //(pData->ub - pData->lb);
     if( do_num > pConvertor->count )
         do_num = pConvertor->count;
 
     if( do_num == 0 && nddt != 0 ){
         for( i = 0; i < nelem; i++ ){
             if( desc[i].elem.common.type == OPAL_DATATYPE_END_LOOP ){
-
                 fc--;
                 continue;
 
@@ -524,20 +523,14 @@ opal_generic_gather_pack_function( opal_convertor_t* pConvertor,
                     continue;
 
                 } else {
-
                     total_pack += opal_convertor_decide_gather( pConvertor, i, forloop, fc, 
                             dst, 
                             src, 
                             &leftover, pConvertor->eStack[i].nelem );
                     dst += opal_datatype_basicDatatypes[desc[i].elem.common.type]->size * desc[i].elem.blocklen * desc[i].elem.count;
-
-
                 }
-
             }
-
         }
-
 
         if( last_elem != -1 ){
             total_pack += opal_convertor_decide_gather( pConvertor, keep_index, keep_forloop, keep_fc, 
@@ -546,21 +539,35 @@ opal_generic_gather_pack_function( opal_convertor_t* pConvertor,
                     &leftover, pConvertor->eStack[keep_index].nelem + 1 );
         }
     } else {
-
         size_t rt;
         for( rt = 0; rt < nddt / do_num; rt++ ){
             opal_run_through( pConvertor, dst, src, &leftover, do_num );
             dst += pData->size * do_num;
             src += (pData->ub - pData->lb) * do_num;
         }
-
+        
         total_pack += rt * do_num * pData->size;
 
         for( i = 0; i < nelem; i++ ){
             pConvertor->eStack[i].nelem -= rt * do_num;
         }
+        
+        do_num = nddt - do_num * rt;
+        
 
-        if( total_pack != pConvertor->local_size ){
+        if( do_num != 0 ){
+            opal_run_through( pConvertor, dst, src, &leftover, do_num );
+            dst += pData->size * do_num;
+            src += (pData->ub - pData->lb) * do_num;
+
+            total_pack += do_num * pData->size;
+            
+            for( i = 0; i < nelem; i++ ){
+                pConvertor->eStack[i].nelem -= do_num;
+            }
+        }
+
+        if( total_pack != pConvertor->local_size && leftover != 0 ){
             total_pack += opal_run_through_last( pConvertor, dst, src, &leftover );
         }
 

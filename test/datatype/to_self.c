@@ -307,7 +307,7 @@ create_indexed_gap_optimized_ddt( void )
 #define MIN_LENGTH   1024
 #define MAX_LENGTH   512*(1024*1024)
 
-static int cycles  = 10;
+static int cycles  = 20;
 static int trials  = 10;
 static int warmups = 0;
 
@@ -547,7 +547,6 @@ int main( int argc, char* argv[] )
         do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
         MPI_Type_free( &ddt );
 
-
         printf("\n! vector (512, 1, 32) datatype\n\n");
         MPI_Type_vector( 512, 1, 32, MPI_DOUBLE, &ddt );
         MPI_Type_commit( &ddt );
@@ -576,7 +575,7 @@ int main( int argc, char* argv[] )
 
         printf( "\n! optimized indexed gap\n\n" );
         ddt = create_indexed_gap_optimized_ddt();
-        //ompi_datatype_dump( ddt );
+        MPI_DDT_DUMP( ddt );
         do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
         MPI_Type_free( &ddt );
 
@@ -595,6 +594,12 @@ int main( int argc, char* argv[] )
         for( int i = 8; i < 16384; i*=2 ){
             ddt = create_diagonal( i );
             matrix_pack( run_tests, ddt, ddt, MAX_LENGTH );
+            MPI_Type_free( &ddt );
+        }
+        printf("# Unpack\n");
+        for( int i = 8; i < 16384; i*=2 ){
+            ddt = create_diagonal( i );
+            matrix_unpack( run_tests, ddt, ddt, MAX_LENGTH );
             MPI_Type_free( &ddt );
         }
 
