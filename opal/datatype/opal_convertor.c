@@ -494,19 +494,23 @@ opal_generic_gather_pack_function( opal_convertor_t* pConvertor,
     leftover = *max_data;
     pConvertor->pStack[1].disp = disp_hold;
 
-    size_t do_num;// = 36000 / pData->size; //(pData->ub - pData->lb);
-    
+    for( int p = 0; p < nelem; p++ ){
+        printf("elem %d donum %d nddt %d\n",
+                p,
+                pConvertor->eStack[p].nelem,
+                nddt );
+    }
+
+    size_t do_num = 36000 / pData->size; //(pData->ub - pData->lb);
+   
+    /*
     if( 0.07 <  (double)pData->size / (pData->ub - pData->lb) ){
         do_num = 256000 / pData->size;
     } else {
         do_num = 36000 / pData->size;
     }
+    */
     
-    //    printf("donum %zu count %zu 36k %.3f 256k %.3f ",
-  //          do_num,
-    //        pConvertor->count,
-      //      (double)36000. * pData->size / (pData->ub - pData->lb),
-        //    (double)256000. * pData->size / (pData->ub - pData->lb));
     //do_num = do_num / 2 * 2;
     
     

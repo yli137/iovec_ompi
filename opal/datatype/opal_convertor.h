@@ -90,6 +90,7 @@ typedef struct dt_for_count_t dt_for_count_t;
 struct dt_estack_elem_t {
     size_t nelem;
     int32_t last;
+    size_t lsize;
 };
 typedef struct dt_estack_elem_t dt_estack_elem_t;
 
