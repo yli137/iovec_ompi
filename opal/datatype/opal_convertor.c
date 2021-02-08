@@ -213,220 +213,15 @@ opal_convertor_t* opal_convertor_create( int32_t remote_arch, int32_t mode )
     } while(0)
 
 int32_t
-opal_run_through( opal_convertor_t *pConvertor, 
-                  char *dst, char *src, 
-                  size_t *leftover, size_t donum ){
-    const opal_datatype_t *pData = pConvertor->pDesc;
-    dt_elem_desc_t *desc = pData->opt_desc.desc;
-    size_t nelem = pData->opt_desc.used;
-    uint32_t index = pConvertor->pStack[1].index, keep_index;
-
-    dt_for_count_t forloop[10], keep_forloop[10];
-    uint32_t fc = 0, for_sum, keep_fc, last_elem = -1;
-
-    uint32_t i;
-
-    for( i = 0; i < nelem; i++ ){
-        if( desc[i].elem.common.type == OPAL_DATATYPE_END_LOOP ){
-
-            fc--;
-            continue;
-
-        } else if( desc[i].elem.common.type == OPAL_DATATYPE_LOOP ){
-
-            forloop[fc].count = desc[i%nelem].loop.loops;
-            fc++;
-            continue;
-
-        } else if( desc[i].elem.common.flags & OPAL_DATATYPE_FLAG_DATA ){
-
-            if( pConvertor->eStack[i].last == 1 ){
-                pConvertor->eStack[i].last = 0;
-                opal_convertor_decide_gather( pConvertor, i, forloop, fc,
-                                              dst,
-                                              src,
-                                              leftover, donum );
-                dst += opal_datatype_basicDatatypes[desc[i].elem.common.type]->size * desc[i].elem.blocklen * desc[i].elem.count;
-                pConvertor->eStack[i].last = 1;
-            } else {
-                opal_convertor_decide_gather( pConvertor, i, forloop, fc,
-                                              dst,
-                                              src,
-                                              leftover, donum );
-                dst += opal_datatype_basicDatatypes[desc[i].elem.common.type]->size * desc[i].elem.blocklen * desc[i].elem.count;
-            }
-        }
-
-    }
-
-    return 1;
-}
-
-size_t
-opal_run_through_last( opal_convertor_t *pConvertor,
-                       char *dst, char *src,
-                       size_t *leftover ){
-    const opal_datatype_t *pData = pConvertor->pDesc;
-    dt_elem_desc_t *desc = pData->opt_desc.desc;
-    size_t nelem = pData->opt_desc.used;
-    uint32_t index = pConvertor->pStack[1].index, keep_index;
-
-    dt_for_count_t forloop[10], keep_forloop[10];
-    uint32_t fc = 0, for_sum, keep_fc, last_elem = -1;
-
-    size_t total_pack = 0;
-    char *keep_dst, *keep_src;
-    uint32_t i;
-
-    for( i = 0; i < nelem; i++ ){
-        if( desc[i].elem.common.type == OPAL_DATATYPE_END_LOOP ){
-
-            fc--;
-            continue;
-
-        } else if( desc[i].elem.common.type == OPAL_DATATYPE_LOOP ){
-
-            forloop[fc].count = desc[i%nelem].loop.loops;
-            fc++;
-            continue;
-
-        } else if( desc[i].elem.common.flags & OPAL_DATATYPE_FLAG_DATA ){
-            if( pConvertor->eStack[i].last == 1 ){
-                keep_dst = dst;
-                keep_src = src;
-                keep_index = i;
-                memcpy( &forloop, &keep_forloop, sizeof(dt_for_count_t) * 10 );
-                keep_fc = fc;
-                last_elem = 1;
-
-                continue;
-
-            } else {
-                total_pack += opal_convertor_decide_gather( pConvertor, i, forloop, fc,
-                        dst,
-                        src,
-                        leftover, pConvertor->eStack[i].nelem );
-                dst += opal_datatype_basicDatatypes[desc[i].elem.common.type]->size * desc[i].elem.blocklen * desc[i].elem.count;
-            }
-        }
-
-    }
-
-    if( last_elem != -1 ){
-        total_pack += opal_convertor_decide_gather( pConvertor, keep_index, keep_forloop, keep_fc,
-                keep_dst,
-                keep_src,
-                leftover, pConvertor->eStack[keep_index].nelem + 1 );
-    }
-
-    return total_pack;
-}
-
-size_t
-opal_convertor_do_gather( opal_convertor_t* conv, uint32_t i,
-        char *dst, char *src, size_t *max_data,
-        size_t donum )
-{
-    const opal_datatype_t *pData = conv->pDesc;
-    dt_elem_desc_t *desc = pData->opt_desc.desc;
-    ddt_elem_desc_t _elem = desc[i].elem;
-    size_t _bytes = opal_datatype_basicDatatypes[desc[i].elem.common.type]->size * _elem.blocklen;
-
-    char *osrc = src + _elem.disp;
-    char *odst = dst;
-
-    uint32_t start_elem = conv->pStack[1].disp / _bytes;
-    ptrdiff_t padding = conv->pStack[1].disp % _bytes;
-
-    size_t total_pack = 0, leftover = *max_data;
-    size_t partial_blen;
-
-    uint32_t j = start_elem;
-    size_t k;
-    
-    if( conv->eStack[i].last == 1 ){
-        for( k = 0; k < donum; k++ ){
-
-            odst = dst;
-            for( ; j < _elem.count; j++ ){
-
-                if( leftover >= _bytes - padding ) {      
-                    memcpy( odst,
-                            osrc + j * _elem.extent + padding,
-                            _bytes - padding );
-
-                    total_pack += _bytes - padding;
-                    odst += _bytes - padding;
-
-                    leftover -= _bytes - padding;
-                    conv->pStack[1].disp += _bytes - padding;
-                    
-                    padding = 0;
-                } else {
-                    partial_blen = leftover / opal_datatype_basicDatatypes[desc[i].elem.common.type]->size;
-                    memcpy( odst,
-                            osrc + j * _elem.extent + padding,
-                            partial_blen * opal_datatype_basicDatatypes[desc[i].elem.common.type]->size );
-                    total_pack += partial_blen * opal_datatype_basicDatatypes[desc[i].elem.common.type]->size;
-                    conv->pStack[1].disp += partial_blen * opal_datatype_basicDatatypes[desc[i].elem.common.type]->size;
-
-                    return total_pack;
-
-                }
-            }
-            j = 0;
-
-            dst += pData->size;
-            src += pData->ub - pData->lb;
-
-        }
-
-
-    } else {
-
-        for( k = 0; k < donum; k++ ){
-
-            odst = dst;
-            for( ; j < _elem.count; j++ ){
-                memcpy( odst,
-                        osrc + j * _elem.extent + padding,
-                        _bytes - padding );
-
-                total_pack += _bytes - padding;
-                odst += _bytes - padding;
-                padding = 0;
-            }
-            j = 0;
-
-            dst += pData->size;
-            src += pData->ub - pData->lb;
-
-        }
-        conv->pStack[1].disp = 0;
-    }
-
-    return total_pack;
-}
-
-size_t 
-opal_convertor_decide_gather( opal_convertor_t* conv, uint32_t i, dt_for_count_t forloop[10],
-                              uint32_t fc, char *dst, char *src, size_t *max_data, size_t donum )
-{
-    if( fc == 0 ){
-        return opal_convertor_do_gather( conv, i, dst, src, max_data, donum );
-    }
-}
-
-int32_t
 opal_datatype_pack_mult( opal_convertor_t *pConv, dt_elem_desc_t desc,
-                        size_t count, char *dst, char *src, size_t *leftover )
+                        size_t count, unsigned char *dst, unsigned char *src, size_t *leftover )
 {
     opal_datatype_t *pData = pConv->pDesc;
     size_t total_pack = 0;
     size_t _bytes = opal_datatype_basicDatatypes[desc.elem.common.type]->size * desc.elem.blocklen;
 
-    char *odst = dst + desc.elem.disp,
-         *osrc = src;
+    unsigned char *odst = dst + desc.elem.disp,
+                  *osrc = src;
     uint32_t j = pConv->pStack[1].disp / _bytes;
     ptrdiff_t padding = pConv->pStack[1].disp % _bytes;
     size_t partial_blen;
@@ -477,12 +272,12 @@ opal_datatype_pack_mult( opal_convertor_t *pConv, dt_elem_desc_t desc,
 
 int32_t
 opal_datatype_pack_one( opal_convertor_t *pConv, dt_elem_desc_t desc, 
-                        char *dst, char *src, size_t *leftover )
+                        unsigned char *dst, unsigned char *src, size_t *leftover )
 {
     size_t total_pack = 0;
     size_t _bytes = opal_datatype_basicDatatypes[desc.elem.common.type]->size * desc.elem.blocklen;
 
-    char *odst = dst + desc.elem.disp;
+    unsigned char *odst = dst + desc.elem.disp;
     uint32_t j = pConv->pStack[1].disp / _bytes;
     ptrdiff_t padding = pConv->pStack[1].disp % _bytes;
     size_t partial_blen;
@@ -502,7 +297,7 @@ opal_datatype_pack_one( opal_convertor_t *pConv, dt_elem_desc_t desc,
         } else {
             partial_blen = *leftover / opal_datatype_basicDatatypes[ desc.elem.common.type ]->size;
 
-            memcpy( dst,
+            memcpy( odst,
                     src + j * desc.elem.extent + padding,
                     partial_blen * opal_datatype_basicDatatypes[ desc.elem.common.type ]->size );
 
@@ -532,9 +327,6 @@ opal_generic_gather_pack_function( opal_convertor_t* pConvertor,
 
     size_t nddt = *max_data / pData->size;
     size_t leftover = *max_data;
-    size_t rc = 0;
-    size_t total_pack = 0;
-    ptrdiff_t disp_hold = pConvertor->pStack[1].disp;
 
     if( nddt > pConvertor->count || *max_data > pConvertor->local_size - pConvertor->bConverted ){
         leftover = pConvertor->local_size - pConvertor->bConverted;
@@ -548,13 +340,13 @@ opal_generic_gather_pack_function( opal_convertor_t* pConvertor,
     unsigned char *dst = iov[0].iov_base,
                   *src = pConvertor->pBaseBuf + pConvertor->pStack[0].disp;
 
-    uint32_t i, j;
+    uint32_t i;
     for( i = 0; i < nelem; i++ ){
         pConvertor->eStack[i].nelem = nddt;
         pConvertor->eStack[i].last = 0;
     }
 
-    size_t do_num = nddt;
+//    size_t do_num = nddt;
 
     for( i = pConvertor->pStack[1].index; i < pConvertor->pStack[1].index + nelem && leftover != 0; i++ ){
         if( i != 0 && i % nelem == 0 ){

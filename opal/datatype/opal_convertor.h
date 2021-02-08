@@ -165,30 +165,15 @@ OPAL_DECLSPEC int32_t opal_convertor_unpack( opal_convertor_t* pConv, struct iov
                                              uint32_t* out_size, size_t* max_data );
 
 OPAL_DECLSPEC int32_t opal_datatype_pack_mult( opal_convertor_t* pConv, dt_elem_desc_t desc,
-                                               size_t count, char *dst, char *src, 
+                                               size_t count, unsigned char *dst, unsigned char *src, 
                                                size_t *leftover );
 
 OPAL_DECLSPEC int32_t opal_datatype_pack_one( opal_convertor_t* pConv, dt_elem_desc_t desc, 
-                                              char *dst, char *src, size_t *leftover );
+                                              unsigned char *dst, unsigned char *src, size_t *leftover );
 
 OPAL_DECLSPEC int32_t opal_generic_gather_pack_function( opal_convertor_t* pConvertor,
                                              struct iovec* iov, uint32_t* out_size,
                                              size_t* max_data );
-
-OPAL_DECLSPEC size_t opal_convertor_decide_gather( opal_convertor_t* conv, uint32_t i, dt_for_count_t forloop[10],
-                                                   uint32_t fc, char *dst, char *src, size_t *max_data, size_t donum );
-
-OPAL_DECLSPEC size_t opal_convertor_do_gather( opal_convertor_t* conv, uint32_t i,
-                                               char *dst, char *src, size_t *max_data, 
-                                               size_t donum );
-
-OPAL_DECLSPEC size_t opal_run_through_last( opal_convertor_t *pConvertor,
-                                            char *dst, char *src,
-                                            size_t *leftover );
-
-OPAL_DECLSPEC int32_t opal_run_through( opal_convertor_t *pConvertor,
-                                        char *dst, char *src,
-                                        size_t *leftover, size_t donum);
 
 /*
  *
