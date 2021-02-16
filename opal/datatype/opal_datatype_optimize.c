@@ -311,6 +311,9 @@ int32_t opal_datatype_commit( opal_datatype_t * pData )
         pLast->size            = pData->size;
     }
 
+    pData->qfor = 0;
+
+    /*
     dt_elem_desc_t *desc1 = pData->opt_desc.desc;
     size_t length1 = pData->opt_desc.used;
     uint32_t check = 0, i1, p;
@@ -318,30 +321,13 @@ int32_t opal_datatype_commit( opal_datatype_t * pData )
 
     for( i1 = 0, p = 0; i1 < length1; i1++ ){
         if( desc1[i1].elem.common.type == OPAL_DATATYPE_END_LOOP ){
-            if( p != 0 )
-                desc1[p-1].loop.size = desc1[i1].end_loop.size;
+            //if( p != 0 )
+              //  desc1[p-1].loop.size = desc1[i1].end_loop.size;
         } else if( desc1[i1].elem.common.type == OPAL_DATATYPE_LOOP ){
             p++;
+            pData->qfor = 1;
         }
     }
-
-
-
-    /*
-       for( i1 = 0; i1 < length1; i1++ ){
-       if( desc1[i1].elem.common.type == OPAL_DATATYPE_END_LOOP ){
-       printf("end_loop size %zu\n",
-       desc1[i1].end_loop.size);
-       } else if( desc1[i1].elem.common.type == OPAL_DATATYPE_LOOP ){
-       printf("loop_start count %zu size %zu extent %zu\n",
-       desc1[i1].loop.loops,
-       desc1[i1].loop.size,
-       desc1[i1].loop.extent);
-       } else if( desc1[i1].elem.common.flags & OPAL_DATATYPE_FLAG_DATA ){
-       printf("data\n");
-       }
-       }
-       */
-
+    */
     return OPAL_SUCCESS;
 }

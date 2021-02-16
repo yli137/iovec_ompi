@@ -121,6 +121,8 @@ struct opal_datatype_t {
     uint32_t           loops;    /**< number of loops on the iternal type stack */
 
     /* Attribute fields */
+    int32_t            qfor;
+
     char               name[OPAL_MAX_OBJECT_NAME];  /**< name of the datatype */
     dt_type_desc_t     desc;     /**< the data description */
     dt_type_desc_t     opt_desc; /**< short description of the data used when conversion is useless
