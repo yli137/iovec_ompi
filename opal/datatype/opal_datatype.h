@@ -100,7 +100,6 @@ struct dt_type_desc_t {
 };
 typedef struct dt_type_desc_t dt_type_desc_t;
 
-
 /*
  * The datatype description.
  */

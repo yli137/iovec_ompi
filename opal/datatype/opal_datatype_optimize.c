@@ -311,23 +311,57 @@ int32_t opal_datatype_commit( opal_datatype_t * pData )
         pLast->size            = pData->size;
     }
 
-    pData->qfor = 0;
 
-    /*
     dt_elem_desc_t *desc1 = pData->opt_desc.desc;
     size_t length1 = pData->opt_desc.used;
-    uint32_t check = 0, i1, p;
-    size_t data_size = 0;
+    uint32_t i1;
+    uint32_t BLOCK = 64;
+    ptrdiff_t ptr = 0, prev_ptr = 0;
+    
+    for( i1 = 0; i1 < length1; i1++ ){
+        if( desc1[ i1 ].elem.common.flags & OPAL_DATATYPE_FLAG_DATA ){ 
 
-    for( i1 = 0, p = 0; i1 < length1; i1++ ){
-        if( desc1[i1].elem.common.type == OPAL_DATATYPE_END_LOOP ){
-            //if( p != 0 )
-              //  desc1[p-1].loop.size = desc1[i1].end_loop.size;
-        } else if( desc1[i1].elem.common.type == OPAL_DATATYPE_LOOP ){
-            p++;
-            pData->qfor = 1;
+            ptr = ( desc1[ i1 ].elem.count - 1 ) * desc1[ i1 ].elem.extent + opal_datatype_basicDatatypes[ desc1[ i1 ].elem.common.type ]->size * desc1[ i1 ].elem.blocklen;
+
+            if( i1 == 0 ){
+                /* init the first elem for grouping process */
+                desc1[ i1 ].elem.group = 0;
+                desc1[ i1 ].elem.span = (ptr + desc1[ i1 ].elem.disp) / BLOCK;
+                if( (ptr + desc1[ i1 ].elem.disp) % BLOCK != 0 )
+                    desc1[ i1 ].elem.span++;
+
+            } else {
+                /* calculating previous element if will be on the same cache line
+                 * as the current element
+                 * use prev true ub vs. current starting disp */
+                prev_ptr = ( desc1[ i1-1 ].elem.count - 1 ) * desc1[ i1-1 ].elem.extent + opal_datatype_basicDatatypes[ desc1[ i1-1 ].elem.common.type ]->size * desc1[ i1-1 ].elem.blocklen;
+                
+                if( (prev_ptr + desc1[ i1-1 ].elem.disp) / BLOCK == desc1[ i1 ].elem.disp / BLOCK ){
+                    /* if prev ub is aligned to cache line
+                     * the current elem will deserve a new group 
+                     * else they belong to the same group */
+                    if( (prev_ptr + desc1[ i1-1 ].elem.disp) % BLOCK == 0 ){
+                        desc1[ i1 ].elem.group = desc1[ i1-1 ].elem.group + 1;
+                        desc1[ i1 ].elem.span = 0;
+                    } else {
+                        desc1[ i1 ].elem.group = desc1[ i1-1 ].elem.group;
+                        desc1[ i1 ].elem.span = desc1[ i1-1 ].elem.span;
+                    }
+                } else {
+                    
+                    desc1[ i1 ].elem.group = desc1[ i1-1 ].elem.group + 1;
+                    desc1[ i1 ].elem.span = 0;
+
+                }
+
+                desc1[ i1 ].elem.span += (ptr + desc1[ i1 ].elem.disp) / BLOCK;
+
+                if( (ptr + desc1[ i1 ].elem.disp) % BLOCK != 0 )
+                    desc1[ i1 ].elem.span++;
+
+            }
         }
     }
-    */
+
     return OPAL_SUCCESS;
 }

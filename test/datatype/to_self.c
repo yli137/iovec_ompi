@@ -526,68 +526,26 @@ int main( int argc, char* argv[] )
     }
 
     if( run_tests & DO_CONTIG ) {
-        printf( "\n! contiguous datatype\n\n" );
-        do_test_for_ddt( run_tests, MPI_INT, MPI_INT, MAX_LENGTH );
-
-        printf("\n! vector (512, 1, 2) datatype\n\n");
-        MPI_Type_vector( 512, 1, 2, MPI_DOUBLE, &ddt );
-        MPI_Type_commit( &ddt );
-        do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
-        MPI_Type_free( &ddt );
-
-        printf("\n! vector (512, 1, 4) datatype\n\n");
-        MPI_Type_vector( 512, 1, 4, MPI_DOUBLE, &ddt );
-        MPI_Type_commit( &ddt );
-        do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH ); 
-        MPI_Type_free( &ddt );
-
-        printf("\n! vector (512, 1, 8) datatype\n\n");
-        MPI_Type_vector( 512, 1, 8, MPI_DOUBLE, &ddt );
-        MPI_Type_commit( &ddt );
-        do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
-        MPI_Type_free( &ddt );
-
-        printf("\n! vector (512, 1, 32) datatype\n\n");
-        MPI_Type_vector( 512, 1, 32, MPI_DOUBLE, &ddt );
-        MPI_Type_commit( &ddt );
-        do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH ); 
-        MPI_Type_free( &ddt );
-
-        printf("\n! vector (512, 1, 64) datatype\n\n");
-        MPI_Type_vector( 512, 1, 64, MPI_DOUBLE, &ddt );
-        MPI_Type_commit( &ddt );
-        do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH ); 
-        MPI_Type_free( &ddt );
-
-        printf("\n! vector (512, 1, 256) datatype\n\n");
-        MPI_Type_vector( 512, 1, 256, MPI_DOUBLE, &ddt );
-        MPI_Type_commit( &ddt );
-        do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH ); 
-        MPI_Type_free( &ddt );
-
-        /*
-        printf( "\n! indexed gap\n\n" );
-        ddt = create_indexed_gap_ddt();
-        MPI_DDT_DUMP( ddt );
-        do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
-        MPI_Type_free( &ddt );
-        */
 
         printf( "\n! optimized indexed gap\n\n" );
         ddt = create_indexed_gap_optimized_ddt();
-        MPI_DDT_DUMP( ddt );
-        do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
+        ompi_datatype_dump( ddt );
+        //do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
         MPI_Type_free( &ddt );
 
-        for( int i = 1; i < 15; i++ ){
-            printf("\n! Random indexed ddt indexed(128, %d, 16, MPI_DOUBLE)\n\n", i);
 
-            ddt = create_random_indexed( 128, i, 16, MPI_DOUBLE, 0 );
-            do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
+        //        for( int i = 1; i < 15; i++ ){
+        //printf("\n! Random indexed ddt indexed(128, %d, 16, MPI_DOUBLE)\n\n", i);
+        printf("\n! Random indexed ddt indexed(128, 12, 16, MPI_DOUBLE)\n\n");
+
+            ddt = create_random_indexed( 12, 3, 16, MPI_DOUBLE, 0 );
+        ompi_datatype_dump( ddt );
+//            do_test_for_ddt( run_tests, ddt, ddt, MAX_LENGTH );
             MPI_Type_free( &ddt );
 
-        }
+//        }
 
+        /*
         printf("\n! Diagonal ddt\n\n");
 
         printf("# Pack\n");
@@ -602,6 +560,7 @@ int main( int argc, char* argv[] )
             matrix_unpack( run_tests, ddt, ddt, MAX_LENGTH );
             MPI_Type_free( &ddt );
         }
+        */
 
     }
 

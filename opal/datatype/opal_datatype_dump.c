@@ -98,9 +98,11 @@ int opal_datatype_dump_data_desc( dt_elem_desc_t* pDesc, int nbElems, char* ptr,
                                pDesc->end_loop.items, pDesc->end_loop.first_elem_disp,
                                pDesc->end_loop.size );
         else
-            index += snprintf( ptr + index, length - index, "count %" PRIsize_t " disp 0x%tx (%td) blen %u extent %td (size %zd)\n",
+            index += snprintf( ptr + index, length - index, "count %" PRIsize_t " disp 0x%tx (%td) blen %u extent %td (size %zd) group %d span %d\n",
                                pDesc->elem.count, pDesc->elem.disp, pDesc->elem.disp, pDesc->elem.blocklen,
-                               pDesc->elem.extent, (pDesc->elem.count * pDesc->elem.blocklen * opal_datatype_basicDatatypes[pDesc->elem.common.type]->size) );
+                               pDesc->elem.extent, (pDesc->elem.count * pDesc->elem.blocklen * opal_datatype_basicDatatypes[pDesc->elem.common.type]->size),
+                               pDesc->elem.group,
+                               pDesc->elem.span );
         pDesc++;
 
         if( length <= (size_t)index ) break;
@@ -143,11 +145,11 @@ void opal_datatype_dump( const opal_datatype_t* pData )
         /* If the data is already committed print everything including the last
          * fake OPAL_DATATYPE_END_LOOP entry.
          */
-        index += opal_datatype_dump_data_desc( pData->desc.desc, pData->desc.used + 1, buffer + index, length - index );
+        //index += opal_datatype_dump_data_desc( pData->desc.desc, pData->desc.used + 1, buffer + index, length - index );
         index += snprintf( buffer + index, length - index, "Optimized description \n" );
         index += opal_datatype_dump_data_desc( pData->opt_desc.desc, pData->opt_desc.used + 1, buffer + index, length - index );
     } else {
-        index += opal_datatype_dump_data_desc( pData->desc.desc, pData->desc.used, buffer + index, length - index );
+        //index += opal_datatype_dump_data_desc( pData->desc.desc, pData->desc.used, buffer + index, length - index );
         index += snprintf( buffer + index, length - index, "No optimized description\n" );
     }
     buffer[index] = '\0';  /* make sure we end the string with 0 */
