@@ -341,6 +341,7 @@ opal_generic_gather_pack_function( opal_convertor_t* pConvertor,
     unsigned char *dst,
                   *src = pConvertor->pBaseBuf + pConvertor->pStack[0].disp;
     uint32_t n_pad;
+    size_t SIZE = 200000;
 
     pConvertor->pStack[2].index = pConvertor->pStack[1].index;
 
@@ -355,7 +356,7 @@ opal_generic_gather_pack_function( opal_convertor_t* pConvertor,
         if( nddt == 0 )
             break;
 
-        chunk = 200000 / ( desc[i].elem.span * 64 );
+        chunk = SIZE / ( desc[i].elem.span * 64 );
         /* go through ddt and packing */
 redo_group_pack:
 
@@ -404,7 +405,7 @@ redo_group_pack:
                         group = desc[ i ].elem.group;
                         pConvertor->pStack[2].index = i;
                         npack = 0;
-                        chunk = 32000 / ( desc[ i ].elem.span * 64 );
+                        chunk = SIZE / ( desc[ i ].elem.span * 64 );
                         goto redo_group_pack;
 
                     }

@@ -305,7 +305,7 @@ create_indexed_gap_optimized_ddt( void )
 #define DO_IRECV_ISEND                  0x20000000
 
 #define MIN_LENGTH   1024
-#define MAX_LENGTH   512*(1024*1024)
+#define MAX_LENGTH   64*(1024*1024)
 
 static int cycles  = 10;
 static int trials  = 10;
